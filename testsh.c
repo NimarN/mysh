@@ -4,24 +4,41 @@
 #include <string.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #define BUFSIZE 1000
 #define BYTES 200
 
+void execProg(char **arguments){
+    char *filename = arguments[0];
+    //char **restOfTheArgs = arguments;
+    
+
+    pid_t pid = fork();
+
+    if (pid == 0){
+        execv(filename, arguments);
+        printf("error");
+    }
+
+    int child_status;
+    wait(&child_status);
+    
+}
 void processArgs(char **arguments, int argsize){
     
     if (strcmp(arguments[0], "exit") == 0){
         printf("Exiting...\n");
         exit(1);
     }
-    write(1, "Here are the arguments found: ", 31);
-    for (int i = 0; i < argsize; i++){
-        write(1, arguments[i], strlen(arguments[i]));
-        free(arguments[i]);
-        write(1, " ", 1);
+
+    //check if first argument contains a '/'
+    for (int i = 0; i < strlen(arguments[0]); i++){
+        if(arguments[0][i] == '/'){
+            execProg(arguments);
+        }
     }
-    write(1, "\n", 1);
-    free(arguments);
 }
 
 void acceptArgs(char *buf, int bytes){
@@ -39,8 +56,17 @@ void acceptArgs(char *buf, int bytes){
             
         }
     }
+
+    arguments[argsize] = NULL;
+    
+    
     processArgs(arguments, argsize);
+    for(int i = 0; i < argsize; i++){
+        free(arguments[i]);
+    }
+    free(arguments);
 }
+
 int myshell(){
     
     char *greeting = "Welcome to mysh! :) \n";
