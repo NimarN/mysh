@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include "wildcard.h"
+
 #define BUFSIZE 1000
 #define BYTES 200
 
@@ -41,6 +43,24 @@ void execProg(char *filename, char **arguments){
 //  -execution of local programs 
 //  -exiting the shell 
 void processArgs(char **arguments, int argsize){
+
+    /* WILD CARD EXPANSION HERE*/
+    //once the argument list has been expanded, we can handle all other cases 
+    
+    for (int i=1; i < argsize;i++)
+    {
+        //printf("Arg at %d: %s\n", i, arguments[i]);
+        //if argument has a wildcard, start expansion.
+        if (strchr(arguments[i], '*')!=NULL)
+        {
+            //printf("Found argument with wildcard\n");
+            char *wildcard = (char*)malloc(strlen(arguments[i])+1);
+            strcpy(wildcard, arguments[i]);
+            arguments = startExpansion(wildcard, arguments, i, argsize);
+            free(wildcard);
+        }
+    }
+
     char *filename = arguments[0];
     
 
@@ -49,11 +69,6 @@ void processArgs(char **arguments, int argsize){
         printf("Exiting...\n");
         exit(1);
     }
-
-
-    /* WILD CARD EXPANSION HERE*/
-    //once the argument list has been expanded, we can handle all other cases 
-
     
     //check if first argument contains a '/' this indicates that this will be local program
     for (int i = 0; i < strlen(filename); i++){

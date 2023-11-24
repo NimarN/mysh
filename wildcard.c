@@ -65,11 +65,19 @@ int matchesSuffix (char *dirent, char *suffix)
     return 0;
 }
 
-void printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix)
+//Only touching this method
+char **printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char **argumentList, int position, int argsize)
 {
+    printf("AL Before: ");
+    for (int i = 0; i < argsize; i++){
+        printf("%s ", argumentList[i]);
+    }
+    printf("\n");
     struct dirent *direntPtr;
     int minLength = strlen(prefix) + strlen(suffix);
-    printf("Minlength: %d\n", minLength);
+    int firstMatch = 0;
+    //int argLocation = 0;
+    //printf("Minlength: %d\n", minLength);
     //Loops through a directories entries.
     while ((direntPtr = readdir(dirPtr))!=NULL)
     {
@@ -79,7 +87,28 @@ void printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix)
             matchesSuffix(direntName, suffix);
             if (matchesPrefix(direntName, prefix)==1 && matchesSuffix(direntName, suffix)==1)
             {
-                printf("%s\n", direntName);
+                //printf("WC: %s\n", direntName);
+                if (firstMatch == 0)
+                {
+                    char *match = malloc(strlen(direntName)+1);
+                    strcpy(match, direntName);
+                    argumentList[position] = match;
+                    firstMatch = 1;
+                    position = position+1;
+                }
+                else
+                {
+                    argsize = argsize+1;
+                    position = position+1;
+                    char *match = malloc(strlen(direntName)+1);
+                    strcpy(match, direntName);
+
+                    for (int i = argsize-1; i>=position; i--)
+                    {
+                        argumentList[i] = argumentList[i-1];
+                    }
+                    argumentList[position-1] = match;
+                }
             }
             //uncomment to print all directory entries above the min length
             //printf("%s\n", direntName);            
@@ -87,6 +116,13 @@ void printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix)
         //uncomment to print all directory entries
         //printf("%s\n", direntName);
     }
+    printf("AL After: ");
+    for (int i = 0; i < argsize; i++){
+        printf("%s ", argumentList[i]);
+    }
+    printf("\n");
+
+    return argumentList;
 }
 
 char *stringBeforeWildCard(char *argWithWilcard, int wildcardIndex)
@@ -111,20 +147,20 @@ char *stringAfterWildCard(char *argWithWilcard, int wildcardIndex)
 
 
 //Only call this function once we confirm the parameter has exactly 1 wildcard.
-int main(int argc, char **argv){
+char **startExpansion(char *argWithWildcard, char **argumentList, int position, int argsize)
+{
 
     //Eventually will make main a function that takes an argument with wildcard as parameter.
     //Change line below to test with different wildcard locations.
-    char *argWithWildcard = "foo*bar.txt";
     
     //stores current working directory in char *cwd
     char cwd[PATH_MAX];
 
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        printf("Current working dir: %s\n", cwd);
+        //printf("Current working dir: %s\n", cwd);
     } else {
         perror("getcwd() error");
-        return 1;
+        //return;
     }
 
     DIR *dirPtr;
@@ -140,16 +176,16 @@ int main(int argc, char **argv){
     //printf("Wildcard Index: %d\n", wildcardIndex);
 
     char *prefix = stringBeforeWildCard(argWithWildcard, wildcardIndex);
-    printf("Prefix: %s\n", prefix);
+    //printf("Prefix: %s\n", prefix);
 
     char *suffix = stringAfterWildCard(argWithWildcard, wildcardIndex);
-    printf("Sufix: %s\n", suffix);
+    //printf("Sufix: %s\n", suffix);
 
     dirPtr = opendir(path);
-    printWildcards(dirPtr, argWithWildcard, prefix, suffix);
+    char **argsToReturn = printWildcards(dirPtr, argWithWildcard, prefix, suffix, argumentList, position, argsize);
     closedir(dirPtr);
     free(prefix);
     free(suffix);
 
-    return 1;
+    return argsToReturn;
 }
