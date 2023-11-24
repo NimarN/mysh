@@ -109,7 +109,7 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char
 
                     for (int i = argsize-1; i>=position; i--)
                     {
-                        free(argumentList[i]);
+                        //free(argumentList[i]);
                         argumentList[i] = argumentList[i-1];
                     }
                     //free(argumentList[position]);
