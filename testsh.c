@@ -6,11 +6,11 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-
 #include "wildcard.h"
 
+
 #define BUFSIZE 1000
-#define BYTES 200
+#define BYTES 1
 
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
 void execProg(char *filename, char **arguments){
@@ -34,6 +34,7 @@ void execProg(char *filename, char **arguments){
 
 //processArgs() determines what the argument list consists of 
 //this is where we will process and handle:
+
 //  -wildcards 
 //  -barenames
 //  -builtins
@@ -68,6 +69,11 @@ int processArgs(char **arguments, int argsize){
     //Add Null to end of argument list to denote the end of the list (this is needed for execv)
     arguments[argsize] = NULL; 
     
+
+    //ensure that the file is not null
+    if (!(filename)){
+        return;
+    } 
 
     //if the user types "exit", exit out of the shell
     if (strcmp(filename, "exit") == 0){
@@ -149,6 +155,10 @@ int processArgs(char **arguments, int argsize){
     }
     
     return argsize;
+
+    //print error if command is not recognized
+    //printf("Error: invalid command :(\n");
+
 }
 
 
@@ -164,6 +174,14 @@ void acceptArgs(char *buf, int bytes){
         if (isspace(buf[i])){ 
             char *arg = malloc(i - start + 1); //allocate space for the current argument
             memcpy(arg, buf + start, i - start); //copy the argument from buf to arg
+            
+            //check that the current argument isn't a space
+            
+            if (*arg == 32 || *arg == 10){
+                start = i + 1;
+                continue;
+            } 
+
             arg[i -  start] = '\0'; 
             arguments[argsize] = arg; //add the argument to argument list
             argsize+= 1; //update size
@@ -183,31 +201,67 @@ void acceptArgs(char *buf, int bytes){
     free(arguments);
 }
 
-int myshell(){
+int main(int argc, char **argv){
     
     char *greeting = "Welcome to mysh! :) \n"; //print greeting
-    write(1, greeting, strlen(greeting)); //write the greeting to stdout
+    int fd, command_length, bytes, start = 0;
     char *buf = malloc(BUFSIZE); //allocate buffer on the heap
-    
-    int bytes;
-    
-    //this loop will always run until "exit" is written as the first argument
-    while(1){
+    char *input = NULL;
 
-        write(1, "mysh> ", 6);
-        bytes = read(0, buf, BUFSIZE);
-        char *input = malloc(bytes + 1);
-        memcpy(input, buf, bytes+1);
-        input[bytes] = '\0';
-        acceptArgs(input, bytes); 
-
-        free(input);
+    write(1, greeting, strlen(greeting)); //write the greeting to stdout
+    
+    //Check is user provides a file for batch mode, open if file provided
+    if (argc > 1){
+        fd = open(argv[1], O_RDONLY);
+        if (fd < 0){
+            perror(argv[1]);
+            exit(EXIT_FAILURE);
+        } 
+    } else {
+        //if no file provided take input from stdin
+        fd = STDIN_FILENO;
     }
-    
-    return 1;
-}
 
-int main(int argc, char **argv){
-    myshell();
+    while(1){
+        //prompt message
+        write(1, "mysh> ", 6);
+        //read respective file
+        bytes = read(fd, buf , BUFSIZE);
+        if (bytes == 0){
+            exit(EXIT_SUCCESS);
+        }
+        
+        
+        /* THIS IS FOR BATCH MODE !!*/
+        if (fd != 0){ 
+            for(int i = 0; i < bytes; i++){
+                if(buf[i] == '\n'){ //we have reached the end of a command
+                    command_length = i - start;  //record the length of the command
+                    input = realloc(input, command_length + 1); //allocate space to hold command
+                    memcpy(input, buf + start, command_length); //copy command into input
+                    input[command_length] = '\0'; //null terminate the input 
+                    
+                    acceptArgs(input, command_length);
+                    
+                    start = i + 1; //update start
+                    command_length = 0; //refresh command length
+                } 
+            }
+            //free(input);
+        } else{
+            /* THIS IS FOR INTERACTIVE MODE !!*/
+            char *input = malloc(bytes + 1); //allocate memory for input
+            memcpy(input, buf, bytes+1); //copy the contents of the buffer into input
+            input[bytes] = '\0'; //null terminate
+            
+            //if user enters only a backspace just continue
+            if (strcmp(input, "\n") == 0){
+                free(input);
+                continue;
+            }
+            acceptArgs(input, bytes); 
+            free(input);
+        }
+    }
     return 1;
 }
