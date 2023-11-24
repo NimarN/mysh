@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include "wildcard.h"
 
 
 #define BUFSIZE 1000
@@ -33,36 +34,59 @@ void execProg(char *filename, char **arguments){
 
 //processArgs() determines what the argument list consists of 
 //this is where we will process and handle:
-//  -wildcards (working curr)
-//  -barenames (done)
-//  -builtins *need*
-//  -conditionals *need*
-//  -pipes  *need*
-//  -redirections *need* 
-//  -execution of local programs (done)
-//  -exiting the shell (done)
-void processArgs(char **arguments, int argsize){
+
+//  -wildcards 
+//  -barenames
+//  -builtins
+//  -conditionals 
+//  -pipes 
+//  -redirections 
+//  -execution of local programs 
+//  -exiting the shell 
+int processArgs(char **arguments, int argsize){
+
+    
+    /* WILD CARD EXPANSION HERE*/
+    //once the argument list has been expanded, we can handle all other cases 
+    //printf("ArgSize Before: %d\n", argsize);
+    //printf("Argument 0: %s\n", arguments[0]);
+    for (int i=1; i < argsize;i++)
+    {
+        //printf("Arg at %d: %s\n", i, arguments[i]);
+        //if argument has a wildcard, start expansion.
+        if (strchr(arguments[i], '*')!=NULL)
+        {
+            //printf("Found argument with wildcard\n");
+            argsize = startExpansion(arguments[i], arguments, i, argsize);
+        }
+    }
+
+    //printf("ArgSize After: %d\n", argsize);
+    //printf("Argument 0: %s\n", arguments[0]);
+
     char *filename = arguments[0];
+        
+    //Add Null to end of argument list to denote the end of the list (this is needed for execv)
+    arguments[argsize] = NULL; 
+    
+
     //ensure that the file is not null
     if (!(filename)){
         return;
     } 
+
     //if the user types "exit", exit out of the shell
     if (strcmp(filename, "exit") == 0){
         printf("Exiting...\n");
         exit(1);
     }
-
-
-    /* WILD CARD EXPANSION HERE*/
-    //once the argument list has been expanded, we can handle all other cases 
-
     
     //check if first argument contains a '/' this indicates that this will be local program
     for (int i = 0; i < strlen(filename); i++){
         if(filename[i] == '/'){
+            //printf("Filename: %s|\n", filename);
             execProg(filename, arguments); //execute program 
-            return; 
+            return argsize; 
         }
     }
 
@@ -85,7 +109,7 @@ void processArgs(char **arguments, int argsize){
     if (access(check1, F_OK) == 0){
         execProg(check1, arguments);
         free(check1); //free check1 string and return 
-        return;
+        return argsize;
     } else {
         // free check1 
         free(check1);
@@ -105,7 +129,7 @@ void processArgs(char **arguments, int argsize){
     if (access(check2, F_OK) == 0){
         execProg(check2, arguments); //execute
         free(check2);
-        return;
+        return argsize;
     } else {
         free(check2);
     }
@@ -125,14 +149,16 @@ void processArgs(char **arguments, int argsize){
     if (access(check3, F_OK) == 0){
         execProg(check3, arguments); //execute
         free(check3);
-        return;
+        return argsize;
     } else{
         free(check3);
     }
     
+    return argsize;
+
     //print error if command is not recognized
     //printf("Error: invalid command :(\n");
-    return;
+
 }
 
 
@@ -164,11 +190,8 @@ void acceptArgs(char *buf, int bytes){
         }
     }
 
-    //Add Null to end of argument list to denote the end of the list (this is needed for execv)
-    arguments[argsize] = NULL; 
-
     //pass the argument list and size to processArgs
-    processArgs(arguments, argsize);
+    argsize = processArgs(arguments, argsize);
 
     //free each object in the argument list
     for(int i = 0; i < argsize; i++){
