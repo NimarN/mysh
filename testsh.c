@@ -72,7 +72,7 @@ int processArgs(char **arguments, int argsize){
 
     //ensure that the file is not null
     if (!(filename)){
-        return;
+        return argsize;
     } 
 
     //if the user types "exit", exit out of the shell
