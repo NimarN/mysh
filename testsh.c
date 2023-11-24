@@ -42,7 +42,7 @@ void execProg(char *filename, char **arguments){
 //  -redirections 
 //  -execution of local programs 
 //  -exiting the shell 
-void processArgs(char **arguments, int argsize){
+int processArgs(char **arguments, int argsize){
 
     
     /* WILD CARD EXPANSION HERE*/
@@ -80,7 +80,7 @@ void processArgs(char **arguments, int argsize){
         if(filename[i] == '/'){
             //printf("Filename: %s|\n", filename);
             execProg(filename, arguments); //execute program 
-            return; 
+            return argsize; 
         }
     }
 
@@ -103,7 +103,7 @@ void processArgs(char **arguments, int argsize){
     if (access(check1, F_OK) == 0){
         execProg(check1, arguments);
         free(check1); //free check1 string and return 
-        return;
+        return argsize;
     } else {
         // free check1 
         free(check1);
@@ -123,7 +123,7 @@ void processArgs(char **arguments, int argsize){
     if (access(check2, F_OK) == 0){
         execProg(check2, arguments); //execute
         free(check2);
-        return;
+        return argsize;
     } else {
         free(check2);
     }
@@ -143,12 +143,12 @@ void processArgs(char **arguments, int argsize){
     if (access(check3, F_OK) == 0){
         execProg(check3, arguments); //execute
         free(check3);
-        return;
+        return argsize;
     } else{
         free(check3);
     }
     
-    return;
+    return argsize;
 }
 
 
@@ -173,7 +173,7 @@ void acceptArgs(char *buf, int bytes){
     }
 
     //pass the argument list and size to processArgs
-    processArgs(arguments, argsize);
+    argsize = processArgs(arguments, argsize);
 
     //free each object in the argument list
     for(int i = 0; i < argsize; i++){

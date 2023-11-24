@@ -102,6 +102,8 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char
                 {
                     argsize = argsize+1;
                     position = position+1;
+
+                    //What ever is malloced from here leaks...
                     match = malloc(strlen(direntName)+1);
                     strcpy(match, direntName);
 
@@ -110,6 +112,7 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char
                         free(argumentList[i]);
                         argumentList[i] = argumentList[i-1];
                     }
+                    //free(argumentList[position]);
                     argumentList[position-1] = match;
                 }
             }
