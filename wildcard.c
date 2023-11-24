@@ -93,6 +93,7 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char
                 {
                     match = malloc(strlen(direntName)+1);
                     strcpy(match, direntName);
+                    free(argumentList[position]);
                     argumentList[position] = match;
                     firstMatch = 1;
                     position = position+1;
@@ -106,6 +107,7 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char
 
                     for (int i = argsize-1; i>=position; i--)
                     {
+                        free(argumentList[i]);
                         argumentList[i] = argumentList[i-1];
                     }
                     argumentList[position-1] = match;
