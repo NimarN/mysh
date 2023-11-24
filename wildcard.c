@@ -66,19 +66,20 @@ int matchesSuffix (char *dirent, char *suffix)
 }
 
 //Only touching this method
-char **printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char **argumentList, int position, int argsize)
+int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char **argumentList, int position, int argsize)
 {
-    printf("AL Before: ");
+    /*printf("AL Before: ");
     for (int i = 0; i < argsize; i++){
         printf("%s ", argumentList[i]);
     }
-    printf("\n");
+    printf("\n");*/
     struct dirent *direntPtr;
     int minLength = strlen(prefix) + strlen(suffix);
     int firstMatch = 0;
     //int argLocation = 0;
     //printf("Minlength: %d\n", minLength);
     //Loops through a directories entries.
+    char *match;
     while ((direntPtr = readdir(dirPtr))!=NULL)
     {
         char *direntName = direntPtr->d_name;
@@ -90,7 +91,7 @@ char **printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, c
                 //printf("WC: %s\n", direntName);
                 if (firstMatch == 0)
                 {
-                    char *match = malloc(strlen(direntName)+1);
+                    match = malloc(strlen(direntName)+1);
                     strcpy(match, direntName);
                     argumentList[position] = match;
                     firstMatch = 1;
@@ -100,7 +101,7 @@ char **printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, c
                 {
                     argsize = argsize+1;
                     position = position+1;
-                    char *match = malloc(strlen(direntName)+1);
+                    match = malloc(strlen(direntName)+1);
                     strcpy(match, direntName);
 
                     for (int i = argsize-1; i>=position; i--)
@@ -116,13 +117,13 @@ char **printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, c
         //uncomment to print all directory entries
         //printf("%s\n", direntName);
     }
-    printf("AL After: ");
+    /*printf("AL After: ");
     for (int i = 0; i < argsize; i++){
         printf("%s ", argumentList[i]);
     }
-    printf("\n");
+    printf("\n");*/
 
-    return argumentList;
+    return argsize;
 }
 
 char *stringBeforeWildCard(char *argWithWilcard, int wildcardIndex)
@@ -131,7 +132,6 @@ char *stringBeforeWildCard(char *argWithWilcard, int wildcardIndex)
     char *end = &argWithWilcard[wildcardIndex];
     char *substring = (char *)calloc(1, end - start + 1);
     memcpy(substring, start, end - start);
-
 
     return substring;
 }
@@ -147,7 +147,7 @@ char *stringAfterWildCard(char *argWithWilcard, int wildcardIndex)
 
 
 //Only call this function once we confirm the parameter has exactly 1 wildcard.
-char **startExpansion(char *argWithWildcard, char **argumentList, int position, int argsize)
+int startExpansion(char *argWithWildcard, char **argumentList, int position, int argsize)
 {
 
     //Eventually will make main a function that takes an argument with wildcard as parameter.
@@ -182,10 +182,10 @@ char **startExpansion(char *argWithWildcard, char **argumentList, int position, 
     //printf("Sufix: %s\n", suffix);
 
     dirPtr = opendir(path);
-    char **argsToReturn = printWildcards(dirPtr, argWithWildcard, prefix, suffix, argumentList, position, argsize);
+    argsize = printWildcards(dirPtr, argWithWildcard, prefix, suffix, argumentList, position, argsize);
     closedir(dirPtr);
     free(prefix);
     free(suffix);
 
-    return argsToReturn;
+    return argsize;
 }

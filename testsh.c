@@ -44,9 +44,11 @@ void execProg(char *filename, char **arguments){
 //  -exiting the shell 
 void processArgs(char **arguments, int argsize){
 
+    
     /* WILD CARD EXPANSION HERE*/
     //once the argument list has been expanded, we can handle all other cases 
-    
+    //printf("ArgSize Before: %d\n", argsize);
+    //printf("Argument 0: %s\n", arguments[0]);
     for (int i=1; i < argsize;i++)
     {
         //printf("Arg at %d: %s\n", i, arguments[i]);
@@ -54,14 +56,17 @@ void processArgs(char **arguments, int argsize){
         if (strchr(arguments[i], '*')!=NULL)
         {
             //printf("Found argument with wildcard\n");
-            char *wildcard = (char*)malloc(strlen(arguments[i])+1);
-            strcpy(wildcard, arguments[i]);
-            arguments = startExpansion(wildcard, arguments, i, argsize);
-            free(wildcard);
+            argsize = startExpansion(arguments[i], arguments, i, argsize);
         }
     }
 
+    //printf("ArgSize After: %d\n", argsize);
+    //printf("Argument 0: %s\n", arguments[0]);
+
     char *filename = arguments[0];
+        
+    //Add Null to end of argument list to denote the end of the list (this is needed for execv)
+    arguments[argsize] = NULL; 
     
 
     //if the user types "exit", exit out of the shell
@@ -73,6 +78,7 @@ void processArgs(char **arguments, int argsize){
     //check if first argument contains a '/' this indicates that this will be local program
     for (int i = 0; i < strlen(filename); i++){
         if(filename[i] == '/'){
+            //printf("Filename: %s|\n", filename);
             execProg(filename, arguments); //execute program 
             return; 
         }
@@ -165,9 +171,6 @@ void acceptArgs(char *buf, int bytes){
             
         }
     }
-
-    //Add Null to end of argument list to denote the end of the list (this is needed for execv)
-    arguments[argsize] = NULL; 
 
     //pass the argument list and size to processArgs
     processArgs(arguments, argsize);
