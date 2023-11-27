@@ -124,7 +124,7 @@ int processArgs(char **arguments, int argsize){
         {
             //printf("Found >\n");
             outputFile = arguments[i+1];
-            printf("Current Output File: %s\n", outputFile);
+            //printf("Current Output File: %s\n", outputFile);
             i = i+1;
         }
         else{
