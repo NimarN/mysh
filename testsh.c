@@ -7,30 +7,71 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "wildcard.h"
+#include "arraylist.h"
 
 
 #define BUFSIZE 1000
 #define BYTES 1
 
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
-void execProg(char *filename, char **arguments){
+void execProg(char *filename, char **arguments, char *outputFile){
+    //outputFile = "./ls.txt";
+    if (outputFile == NULL)
+    {
+        //initialize process id and fork()
+        pid_t pid = fork();
+        //printf("PID1: %d", pid);
 
-    //initialize process id and fork()
-    pid_t pid = fork();
+        if (pid == 0){
+            //run the requested file and pass in the argument list
+            //printf("PID2: %d", pid);
+            execv(filename, arguments);
 
-    if (pid == 0){
-        //run the requested file and pass in the argument list
-        execv(filename, arguments);
-
-        //child should not reach here , if it does, print error and exit
-        printf("whoooops! error"); 
-        exit(1);
+            //child should not reach here , if it does, print error and exit
+            printf("whoooops! error"); 
+            exit(EXIT_SUCCESS);
+        }
+        int child_status; 
+        wait(&child_status);
     }
+    else
+    {
+        pid_t pid = fork();
+        //printf("PID: %d", pid);
+        if (pid == 0) {
+            // Child process
+            int fd = open(outputFile,O_CREAT | O_TRUNC | O_WRONLY, 0640);
+            //Sets standardout to the fd of outputfile.
+            //printf("fd: %d", fd);
+            dup2(fd, 1);
+            close(fd);
+            execv(filename, arguments);
 
-    int child_status; 
-    wait(&child_status);
+            // The following code will not be reached if execl is successful
+            printf("Child process\n");
+            exit(EXIT_SUCCESS);
+
+        } else if (pid > 0) {
+            // Parent process
+            wait(NULL); // Wait for the child to finish
+            //printf("Parent process\n");
+        } else {
+            // Forking error
+            perror("Fork failed");
+        }
+    }
 }
 
+void freeList(char **argList, int truncSize)
+{
+    //free each object in the argument list
+    for(int i = 0; i < truncSize; i++){
+        free(argList[i]);
+    }
+    //free the argument list itself
+    free(argList);
+    return;
+}
 
 //processArgs() determines what the argument list consists of 
 //this is where we will process and handle:
@@ -43,6 +84,7 @@ void execProg(char *filename, char **arguments){
 //  -redirections 
 //  -execution of local programs 
 //  -exiting the shell 
+
 int processArgs(char **arguments, int argsize){
 
     
@@ -59,7 +101,7 @@ int processArgs(char **arguments, int argsize){
             //printf("Found argument with wildcard\n");
             argsize = startExpansion(arguments[i], arguments, i, argsize);
         }
-    }
+    }  
 
     //printf("ArgSize After: %d\n", argsize);
     //printf("Argument 0: %s\n", arguments[0]);
@@ -69,9 +111,49 @@ int processArgs(char **arguments, int argsize){
     //Add Null to end of argument list to denote the end of the list (this is needed for execv)
     arguments[argsize] = NULL; 
     
+    //Below will store output redirection file in outputRedir and create a truncated copy of arglist
+    char *outputFile = NULL;
+    arraylist_t *list = al_create(argsize);
+    //char **truncArgs = (char**)malloc(sizeof(arguments)*1000);
+    //char *match;
+    //int j = 0;
+    
+    
+    for (int i = 0; i < argsize; i++){
+        if (strcmp(arguments[i], ">")==0 && arguments[i+1] != NULL)
+        {
+            //printf("Found >\n");
+            outputFile = arguments[i+1];
+            printf("Current Output File: %s\n", outputFile);
+            i = i+1;
+        }
+        else{
+            al_push(list, arguments[i]);
+        }
+    }
+    char *n;
+    int newLength = al_length(list);
+    int k = newLength-1;
+    //printf("AL length: %d\n", al_length(list));
+    char **truncArgs = malloc(sizeof(arguments[0])*(newLength+2));
+    while (al_pop(list, &n)) {
+	    //printf("Popped %s\n", n);
+        truncArgs[k] = n;
+        k = k-1;
+    }
+    for (int i = 0; i<newLength ;i++)
+    {
+        //printf("TA: %s\n", truncArgs[i]);
+    }
+    al_destroy(list);
+    free(list);
+    truncArgs[newLength] = NULL; 
+
+    //printf("Got here\n");
 
     //ensure that the file is not null
     if (!(filename)){
+        //freeList(truncArgs,argsize);
         return argsize;
     } 
 
@@ -85,7 +167,8 @@ int processArgs(char **arguments, int argsize){
     for (int i = 0; i < strlen(filename); i++){
         if(filename[i] == '/'){
             //printf("Filename: %s|\n", filename);
-            execProg(filename, arguments); //execute program 
+            execProg(filename, truncArgs, outputFile); //execute program 
+            //freeList(truncArgs,argsize);
             return argsize; 
         }
     }
@@ -107,8 +190,9 @@ int processArgs(char **arguments, int argsize){
     
     //if the current program is in "/usr/local/bin/" then execute it
     if (access(check1, F_OK) == 0){
-        execProg(check1, arguments);
+        execProg(check1, truncArgs, outputFile);
         free(check1); //free check1 string and return 
+        //freeList(truncArgs,argsize);
         return argsize;
     } else {
         // free check1 
@@ -127,8 +211,9 @@ int processArgs(char **arguments, int argsize){
 
     //check if program is in "/usr/bin"
     if (access(check2, F_OK) == 0){
-        execProg(check2, arguments); //execute
+        execProg(check2, truncArgs, outputFile); //execute
         free(check2);
+        //freeList(truncArgs,argsize);
         return argsize;
     } else {
         free(check2);
@@ -147,13 +232,14 @@ int processArgs(char **arguments, int argsize){
 
     //check if curr prog is in "/bin"
     if (access(check3, F_OK) == 0){
-        execProg(check3, arguments); //execute
+        execProg(check3, truncArgs, outputFile); //execute
         free(check3);
+        //freeList(truncArgs,argsize);
         return argsize;
     } else{
         free(check3);
     }
-    
+    //freeList(truncArgs,argsize);
     return argsize;
 
     //print error if command is not recognized
@@ -165,7 +251,7 @@ int processArgs(char **arguments, int argsize){
 
 //acceptArgs will iterate through the buffer and collect a sequence of tokens (arguments)
 void acceptArgs(char *buf, int bytes){
-    char **arguments = malloc(100); //allocate space for our argument list
+    char **arguments = malloc(10000); //allocate space for our argument list
     int argsize = 0; //initial argument list size
     int start = 0; 
     for (int i = 0; i < bytes; i++){
