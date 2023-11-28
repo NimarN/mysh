@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include "wildcard.h"
 #include "arraylist.h"
@@ -14,53 +15,52 @@
 #define BYTES 1
 
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
-void execProg(char *filename, char **arguments, char *outputFile){
+void execProg(char *filename, char **arguments, char *outputFile, char *inputFile){
     //outputFile = "./ls.txt";
-    if (outputFile == NULL)
-    {
-        //initialize process id and fork()
-        pid_t pid = fork();
-        //printf("PID1: %d", pid);
+    //initialize process id and fork()
 
-        if (pid == 0){
+        pid_t pid = fork();
+        //printf("PID1: %d", pid)
+        if (pid == 0)
+        {
             //run the requested file and pass in the argument list
             //printf("PID2: %d", pid);
-            execv(filename, arguments);
 
+            // Child process
+            if (outputFile!=NULL)
+            {
+                int fd = open(outputFile,O_CREAT | O_TRUNC | O_WRONLY, 0640);
+                //Sets standardout to the fd of outputfile.
+                //printf("fd: %d", fd);
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+            }
+            if (inputFile != NULL)
+            {
+                //close(STDIN_FILENO);
+                int fd = open(inputFile, O_RDONLY, S_IWUSR | S_IRUSR);
+                //Sets standardout to the fd of outputfile.
+                //printf("fd: %d", fd);
+                dup2(fd, STDIN_FILENO);
+                close(fd);
+            }
+            execv(filename, arguments);
             //child should not reach here , if it does, print error and exit
             printf("whoooops! error"); 
             exit(EXIT_SUCCESS);
-        }
-        int child_status; 
-        wait(&child_status);
-    }
-    else
-    {
-        pid_t pid = fork();
-        //printf("PID: %d", pid);
-        if (pid == 0) {
-            // Child process
-            int fd = open(outputFile,O_CREAT | O_TRUNC | O_WRONLY, 0640);
-            //Sets standardout to the fd of outputfile.
-            //printf("fd: %d", fd);
-            dup2(fd, 1);
-            close(fd);
-            execv(filename, arguments);
-
-            // The following code will not be reached if execl is successful
-            printf("Child process\n");
-            exit(EXIT_SUCCESS);
-
-        } else if (pid > 0) {
+            } 
+        else if (pid > 0) 
+        {
             // Parent process
             wait(NULL); // Wait for the child to finish
             //printf("Parent process\n");
-        } else {
+        } 
+        else 
+        {
             // Forking error
             perror("Fork failed");
         }
     }
-}
 
 void freeList(char **argList, int truncSize)
 {
@@ -113,6 +113,7 @@ int processArgs(char **arguments, int argsize){
     
     //Below will store output redirection file in outputRedir and create a truncated copy of arglist
     char *outputFile = NULL;
+    char *inputFile = NULL;
     arraylist_t *list = al_create(argsize);
     //char **truncArgs = (char**)malloc(sizeof(arguments)*1000);
     //char *match;
@@ -125,10 +126,19 @@ int processArgs(char **arguments, int argsize){
             //printf("Found >\n");
             outputFile = arguments[i+1];
             //printf("Current Output File: %s\n", outputFile);
+            //printf("Index: %d\n", i);
+            i = i+1;
+        }
+        else if (strcmp(arguments[i], "<")==0 && arguments[i+1] != NULL)
+        {
+            //printf("Found >\n");
+            inputFile = arguments[i+1];
+            //printf("Current Input File: %s\n", inputFile);
             i = i+1;
         }
         else{
             al_push(list, arguments[i]);
+            //printf("Pushed %s\n", arguments[i]);
         }
     }
     char *n;
@@ -167,7 +177,7 @@ int processArgs(char **arguments, int argsize){
     for (int i = 0; i < strlen(filename); i++){
         if(filename[i] == '/'){
             //printf("Filename: %s|\n", filename);
-            execProg(filename, truncArgs, outputFile); //execute program 
+            execProg(filename, truncArgs, outputFile, inputFile); //execute program 
             //freeList(truncArgs,argsize);
             return argsize; 
         }
@@ -190,7 +200,7 @@ int processArgs(char **arguments, int argsize){
     
     //if the current program is in "/usr/local/bin/" then execute it
     if (access(check1, F_OK) == 0){
-        execProg(check1, truncArgs, outputFile);
+        execProg(check1, truncArgs, outputFile, inputFile);
         free(check1); //free check1 string and return 
         //freeList(truncArgs,argsize);
         return argsize;
@@ -211,7 +221,7 @@ int processArgs(char **arguments, int argsize){
 
     //check if program is in "/usr/bin"
     if (access(check2, F_OK) == 0){
-        execProg(check2, truncArgs, outputFile); //execute
+        execProg(check2, truncArgs, outputFile, inputFile); //execute
         free(check2);
         //freeList(truncArgs,argsize);
         return argsize;
@@ -232,7 +242,7 @@ int processArgs(char **arguments, int argsize){
 
     //check if curr prog is in "/bin"
     if (access(check3, F_OK) == 0){
-        execProg(check3, truncArgs, outputFile); //execute
+        execProg(check3, truncArgs, outputFile, inputFile); //execute
         free(check3);
         //freeList(truncArgs,argsize);
         return argsize;
