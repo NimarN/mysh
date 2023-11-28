@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <linux/limits.h>
+#include "arraylist.h"
 
 //struct dirent {
 //    ino_t          d_ino;       /* inode number */
@@ -66,13 +67,14 @@ int matchesSuffix (char *dirent, char *suffix)
 }
 
 //Only touching this method
-int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char **argumentList, int position, int argsize)
+int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, arraylist_t *argArray, int position, int argsize)
 {
-    /*printf("AL Before: ");
-    for (int i = 0; i < argsize; i++){
+    char **argumentList = argArray-> data;
+    //printf("AL Before: ");
+    /*for (int i = 0; i < argArray->length; i++){
         printf("%s ", argumentList[i]);
-    }
-    printf("\n");*/
+    }*/
+    //printf("\n");
     struct dirent *direntPtr;
     int minLength = strlen(prefix) + strlen(suffix);
     int firstMatch = 0;
@@ -101,6 +103,7 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char
                 else
                 {
                     argsize = argsize+1;
+                    argArray->length = (argArray->length) + 1;
                     position = position+1;
 
                     //What ever is malloced from here leaks...
@@ -122,11 +125,11 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, char
         //uncomment to print all directory entries
         //printf("%s\n", direntName);
     }
-    /*printf("AL After: ");
-    for (int i = 0; i < argsize; i++){
+    //printf("AL After: ");
+    /*for (int i = 0; i < argsize; i++){
         printf("%s ", argumentList[i]);
-    }
-    printf("\n");*/
+    }*/
+    //printf("\n");
 
     return argsize;
 }
@@ -152,7 +155,7 @@ char *stringAfterWildCard(char *argWithWilcard, int wildcardIndex)
 
 
 //Only call this function once we confirm the parameter has exactly 1 wildcard.
-int startExpansion(char *argWithWildcard, char **argumentList, int position, int argsize)
+int startExpansion(char *argWithWildcard, arraylist_t argArray, char **argumentList, int position, int argsize)
 {
 
     //Eventually will make main a function that takes an argument with wildcard as parameter.
@@ -187,7 +190,7 @@ int startExpansion(char *argWithWildcard, char **argumentList, int position, int
     //printf("Sufix: %s\n", suffix);
 
     dirPtr = opendir(path);
-    argsize = printWildcards(dirPtr, argWithWildcard, prefix, suffix, argumentList, position, argsize);
+    argsize = printWildcards(dirPtr, argWithWildcard, prefix, suffix, &argArray, position, argsize);
     closedir(dirPtr);
     free(prefix);
     free(suffix);
