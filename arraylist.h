@@ -10,4 +10,4 @@ arraylist_t *al_create(unsigned);
 void al_destroy(arraylist_t *);
 unsigned al_length(arraylist_t *);
 int al_push(arraylist_t *, char *);
-int al_pop(arraylist_t *, char *);
+void *al_pop(arraylist_t *L);

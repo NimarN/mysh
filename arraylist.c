@@ -74,13 +74,15 @@ int al_push(arraylist_t *L, char *elem)
 // write item to dest (if dest is non-NULL)
 // return 1 on success, 0 on failure (i.e., list is empty)
 
-int al_pop(arraylist_t *L, char *dest)
-{
-    if (L->length == 0) return 0;
+void *al_pop(arraylist_t *L)
+{   
+    char *popped_elem;
+    if (L->length == 0) return NULL;
 
     L->length--;
-    if (dest) dest = L->data[L->length];
+    popped_elem = L->data[L->length];
+    //printf("dest: %s\n", popped_elem);
     if (DEBUG) printf("Removed %s; new length %d\n", L->data[L->length], L->length);
 
-    return 1;
+    return popped_elem;
 }
