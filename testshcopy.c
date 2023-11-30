@@ -7,10 +7,40 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "wildcard.h"
+#include "testsh.h"
+#include "arraylist.h"
 
 
 #define BUFSIZE 1000
 #define BYTES 1
+
+void execPipe(char **pipeArgs, char **pipeOut, int pipeArgsSize, int argsize){
+    int fd[2]; //declare read and write end of pipe
+    pipe(fd); //init pipe
+
+    if (fork() == 0){
+        //child
+        dup2(fd[1], STDOUT_FILENO); //set stdout to the write end of pipe
+        processArgs(pipeArgs, pipeArgsSize); //execute the left half of the pipe command
+        exit(1);
+    }
+    close(fd[1]); //close write end of fd
+   
+
+    if (fork() == 0){
+        dup2(fd[0], STDIN_FILENO); //set stdin to read end of pipe
+        processArgs(pipeOut, argsize - pipeArgsSize - 1); //execute the right half of the pipe command
+    }
+
+    for (int i = 0; i < pipeArgsSize; i++){
+        free(pipeArgs[i]); //free the individual objects of the pipe argument list (left half)
+    } 
+
+    free(pipeArgs); //free the actual pipe
+
+    return;
+
+}
 
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
 void execProg(char *filename, char **arguments){
@@ -29,6 +59,7 @@ void execProg(char *filename, char **arguments){
 
     int child_status; 
     wait(&child_status);
+    return;
 }
 
 
@@ -43,57 +74,11 @@ void execProg(char *filename, char **arguments){
 //  -redirections 
 //  -execution of local programs 
 //  -exiting the shell 
-int processArgs(char **arguments, int argsize){
 
-    
-    /* WILD CARD EXPANSION HERE*/
-    //once the argument list has been expanded, we can handle all other cases 
-    //printf("ArgSize Before: %d\n", argsize);
-    //printf("Argument 0: %s\n", arguments[0]);
-    for (int i=1; i < argsize;i++)
-    {
-        //printf("Arg at %d: %s\n", i, arguments[i]);
-        //if argument has a wildcard, start expansion.
-        if (strchr(arguments[i], '*')!=NULL)
-        {
-            //printf("Found argument with wildcard\n");
-            argsize = startExpansion(arguments[i], arguments, i, argsize);
-        }
-    }
-
-    //printf("ArgSize After: %d\n", argsize);
-    //printf("Argument 0: %s\n", arguments[0]);
-
-    char *filename = arguments[0];
-        
-    //Add Null to end of argument list to denote the end of the list (this is needed for execv)
-    arguments[argsize] = NULL; 
-    
-
-    //ensure that the file is not null
-    if (!(filename)){
-        return argsize;
-    } 
-
-    //if the user types "exit", exit out of the shell
-    if (strcmp(filename, "exit") == 0){
-        printf("Exiting...\n");
-        exit(1);
-    }
-    
-    //check if first argument contains a '/' this indicates that this will be local program
-    for (int i = 0; i < strlen(filename); i++){
-        if(filename[i] == '/'){
-            //printf("Filename: %s|\n", filename);
-            execProg(filename, arguments); //execute program 
-            return argsize; 
-        }
-    }
-
-    /*SHELL BUILT INS HERE*/
-    
+void checkBareNames(char **arguments, int argsize){
 
     //If the first argument is not a shell built in or a local program, it is a barename 
+    char *filename = arguments[0];
     
     //we are building this string: check1 = "usr/local/bin/<filename>"
     //allocate enough space for the full pathfile and a null terminator 
@@ -109,7 +94,7 @@ int processArgs(char **arguments, int argsize){
     if (access(check1, F_OK) == 0){
         execProg(check1, arguments);
         free(check1); //free check1 string and return 
-        return argsize;
+        return;
     } else {
         // free check1 
         free(check1);
@@ -129,7 +114,7 @@ int processArgs(char **arguments, int argsize){
     if (access(check2, F_OK) == 0){
         execProg(check2, arguments); //execute
         free(check2);
-        return argsize;
+        return;
     } else {
         free(check2);
     }
@@ -149,10 +134,104 @@ int processArgs(char **arguments, int argsize){
     if (access(check3, F_OK) == 0){
         execProg(check3, arguments); //execute
         free(check3);
-        return argsize;
+        return;
     } else{
         free(check3);
     }
+
+}
+int processArgs(char **arguments, int argsize){
+
+    char *filename = arguments[0];
+    
+    if (!(filename)){
+        return argsize;
+    } 
+
+    
+    /* WILD CARD EXPANSION HERE*/
+    //once the argument list has been expanded, we can handle all other cases 
+    //printf("ArgSize Before: %d\n", argsize);
+    //printf("Argument 0: %s\n", arguments[0]);
+    for (int i=1; i < argsize;i++)
+    {
+        //printf("Arg at %d: %s\n", i, arguments[i]);
+        //if argument has a wildcard, start expansion.
+        if (arguments[i] == NULL) {continue;}
+        if (strchr(arguments[i], '*')!=NULL)
+        {
+            //printf("Found argument with wildcard\n");
+            argsize = startExpansion(arguments[i], arguments, i, argsize);
+        }
+    }
+
+    //printf("ArgSize After: %d\n", argsize);
+    //printf("Argument 0: %s\n", arguments[0]);
+
+    
+        
+    //Add Null to end of argument list to denote the end of the list (this is needed for execv)
+    arguments[argsize] = NULL; 
+    
+
+    //ensure that the file is not null
+    
+
+    //if the user types "exit", exit out of the shell
+    if (strcmp(filename, "exit") == 0){
+        printf("Exiting...\n");
+        exit(1);
+    }
+
+    
+    char **pipeArgList = malloc(100);
+    
+    
+    int pipeFlag = 0;
+    for(int i = 0; i < argsize ; i++){
+        //pipeArgList[i] = arguments[i];
+        if (arguments[i] == NULL) {continue;}
+        for(int j = 0; j < strlen(arguments[i]); j++){
+            if(arguments[i][j] == 124){
+                pipeFlag = 1;
+                pipeArgList[i] = NULL;
+                char **pipeOutput = arguments + i + 1;
+                execPipe(pipeArgList, pipeOutput, i, argsize);
+                return argsize;
+                
+            }
+        }
+        pipeArgList[i] = malloc(strlen(arguments[i]) + 1);
+        strcpy(pipeArgList[i], arguments[i]);
+        
+    }
+
+    if (pipeFlag == 0){
+        for(int i = 0; i < argsize; i++){
+            if (pipeArgList[i] == NULL){continue;}
+            free(pipeArgList[i]);
+        } 
+    }
+    free(pipeArgList);
+
+    
+    
+    
+    //check if first argument contains a '/' this indicates that this will be local program
+    for (int i = 0; i < strlen(filename); i++){
+        if(filename[i] == '/'){
+            //printf("Filename: %s|\n", filename);
+            execProg(filename, arguments); //execute program 
+            return argsize;
+        }
+    }
+
+    /*SHELL BUILT INS HERE*/
+    
+
+    /*BARENAME CHECK HERE*/
+    
+    checkBareNames(arguments, argsize);
     
     return argsize;
 
@@ -171,7 +250,7 @@ void acceptArgs(char *buf, int bytes){
     for (int i = 0; i < bytes; i++){
 
         //if you encounter a space, this marks the end of a single argument
-        if (isspace(buf[i])){ 
+        if (i > 0 && isspace(buf[i]) && !(isspace(buf[i - 1]))){ 
             char *arg = malloc(i - start + 1); //allocate space for the current argument
             memcpy(arg, buf + start, i - start); //copy the argument from buf to arg
             
@@ -207,6 +286,7 @@ int main(int argc, char **argv){
     int fd, command_length, bytes, start = 0;
     char *buf = malloc(BUFSIZE); //allocate buffer on the heap
     char *input = NULL;
+    int bytesLeftover = 0;
 
     write(1, greeting, strlen(greeting)); //write the greeting to stdout
     
@@ -251,14 +331,16 @@ int main(int argc, char **argv){
         } else{
             /* THIS IS FOR INTERACTIVE MODE !!*/
             char *input = malloc(bytes + 1); //allocate memory for input
-            memcpy(input, buf, bytes+1); //copy the contents of the buffer into input
-            input[bytes] = '\0'; //null terminate
-            
+            memcpy(input + bytesLeftover, buf, bytes+1); //copy the contents of the buffer into input
+            //null terminate
+
+            input[bytes] = '\0'; 
             //if user enters only a backspace just continue
             if (strcmp(input, "\n") == 0){
                 free(input);
                 continue;
             }
+            
             acceptArgs(input, bytes); 
             free(input);
         }

@@ -186,6 +186,7 @@ int processArgs(arraylist_t *arguments){
     if (!(filename)){
         return argsize;
     } 
+    
     if (strcmp(filename, "exit") == 0){
         printf("Exiting...\n");
         exit(1);
@@ -314,10 +315,6 @@ int processArgs(arraylist_t *arguments){
         
     }
 
- 
-    
-
-    
     /*EXECTUION OF LOCAL PROGRAMS*/
     //check if first argument contains a '/' this indicates that this will be local program
     filename = arguments->data[0];
@@ -334,14 +331,9 @@ int processArgs(arraylist_t *arguments){
     /*BARENAME CHECK HERE*/
     checkBareNames(arguments, argsize, outputFile, inputFile);
 
-    for (int i = 0; i < arguments->length; i++){
-        free(arguments->data[i]);
-    }
     for (int i = 0; i < pipeArgList->length; i++){
         free(pipeArgList->data[i]);
     }
-
-    
 
     al_destroy(pipeArgList);
     free(pipeArgList);
@@ -389,14 +381,14 @@ void acceptArgs(char *buf, int bytes){
     
     //free the argument list 
     
-    /*
+    
     for (int i = 0; i < argList->length; i++){
         free(argList->data[i]);
     }
     al_destroy(argList);
-    free(argList); */
+    free(argList); 
     
-    
+    return;
 }
 
 int main(int argc, char **argv){
@@ -439,7 +431,6 @@ int main(int argc, char **argv){
                     input = realloc(input, command_length + 1); //allocate space to hold command
                     memcpy(input, buf + start, command_length); //copy command into input
                     input[command_length] = '\0'; //null terminate the input 
-                    
                     acceptArgs(input, command_length);
                     
                     start = i + 1; //update start
