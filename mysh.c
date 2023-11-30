@@ -245,7 +245,7 @@ int processArgs(arraylist_t *arguments){
     //arguments[argsize] = NULL; 
     al_push(arguments, NULL);
 
-    //cd here?
+    //cd here
     //printf("%d\n", argsize);
     //printf("%s\n", arguments->data[0]);
     if (argsize==2 && strcmp(arguments->data[0],"cd")==0)
@@ -255,16 +255,19 @@ int processArgs(arraylist_t *arguments){
             char cwd[PATH_MAX];
             getcwd(cwd, sizeof(cwd));
             printf("success!\nCurrent Dir is: %s\n", cwd);
+            return argsize;
         }
         else{
             char cwd[PATH_MAX];
             getcwd(cwd, sizeof(cwd));
             printf("fail!\nCurrent Dir is: %s\n", cwd);
+            return argsize;
         }
     }
     else if (argsize!=2 && strcmp(arguments->data[0],"cd")==0)
     {
         printf("Wrong Number of Arguments for cd\n");
+        return argsize;
     }
 
     int redirectFlag = 0;
