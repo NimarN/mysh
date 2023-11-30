@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <linux/limits.h>
 
 #include "wildcard.h"
 #include "mysh.h"
@@ -48,9 +49,10 @@ void execPipe(arraylist_t *pipeArgs, arraylist_t *pipeOut, int pipeArgsSize, int
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
 void execProg(char *filename, char **arguments, char *outputFile, char *inputFile){
 
+    int stdinfd = dup(0);
+    int stdoutfd = dup(1);
     //initialize process id and fork()
     pid_t pid = fork();
-
     if (pid == 0){
         //run the requested file and pass in the argument list
 
@@ -72,8 +74,37 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
             dup2(fd, STDIN_FILENO);
             close(fd);
         }
-        execv(filename, arguments);
-      
+        if (strcmp(arguments[0], "pwd") == 0) {
+            // pwd command
+            char cwd[PATH_MAX];
+            if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                printf("%s\n", cwd);
+                //int stdInFd = STDIN_FILENO;
+                dup2(stdinfd, 0);
+                close(stdinfd);
+                dup2(stdoutfd, 1);
+                close(stdoutfd);
+                //success
+                return;
+            } 
+            else {
+                perror("pwd");
+                dup2(stdinfd, 0);
+                close(stdinfd);
+                dup2(stdoutfd, 1);
+                close(stdoutfd);
+                //fail
+                return;
+            }
+        }
+        else if (strcmp(arguments[0], "which") == 0) {
+            // which command
+            
+        }
+        else
+        {
+            execv(filename, arguments);
+        }
         //child should not reach here , if it does, print error and exit
         printf("whoooops! error"); 
         exit(1);
@@ -213,6 +244,28 @@ int processArgs(arraylist_t *arguments){
     //Add Null to end of argument list to denote the end of the list (this is needed for execv)
     //arguments[argsize] = NULL; 
     al_push(arguments, NULL);
+
+    //cd here?
+    //printf("%d\n", argsize);
+    //printf("%s\n", arguments->data[0]);
+    if (argsize==2 && strcmp(arguments->data[0],"cd")==0)
+    {
+        if(chdir(arguments->data[1])==0)
+        {
+            char cwd[PATH_MAX];
+            getcwd(cwd, sizeof(cwd));
+            printf("success!\nCurrent Dir is: %s\n", cwd);
+        }
+        else{
+            char cwd[PATH_MAX];
+            getcwd(cwd, sizeof(cwd));
+            printf("fail!\nCurrent Dir is: %s\n", cwd);
+        }
+    }
+    else if (argsize!=2 && strcmp(arguments->data[0],"cd")==0)
+    {
+        printf("Wrong Number of Arguments for cd\n");
+    }
 
     int redirectFlag = 0;
     char *outputFile = NULL;
