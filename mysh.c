@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include "wildcard.h"
@@ -45,22 +46,56 @@ void execPipe(arraylist_t *pipeArgs, arraylist_t *pipeOut, int pipeArgsSize, int
 }
 
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
-void execProg(char *filename, char **arguments){
+void execProg(char *filename, char **arguments, char *outputFile, char *inputFile){
 
     //initialize process id and fork()
     pid_t pid = fork();
 
     if (pid == 0){
         //run the requested file and pass in the argument list
-        execv(filename, arguments);
 
+        // Child process
+        if (outputFile!=NULL)
+        {
+            int fd = open(outputFile,O_CREAT | O_TRUNC | O_WRONLY, 0640);
+            //Sets standardout to the fd of outputfile.
+            //printf("fd: %d", fd);
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
+        if (inputFile != NULL)
+        {
+            //close(STDIN_FILENO);
+            int fd = open(inputFile, O_RDONLY, S_IWUSR | S_IRUSR);
+            //Sets standardout to the fd of outputfile.
+            //printf("fd: %d", fd);
+            dup2(fd, STDIN_FILENO);
+            close(fd);
+        }
+        execv(filename, arguments);
+      
         //child should not reach here , if it does, print error and exit
         printf("whoooops! error"); 
         exit(1);
     }
+    else if (pid > 0){
+        int child_status;
+        wait(&child_status);
+        return;
+    } 
+    else {
+        perror("fork failed");
+    }
+}
 
-    int child_status; 
-    wait(&child_status);
+void freeList(char **argList, int truncSize)
+{
+    //free each object in the argument list
+    for(int i = 0; i < truncSize; i++){
+        free(argList[i]);
+    }
+    //free the argument list itself
+    free(argList);
     return;
 }
 
@@ -69,7 +104,7 @@ void execProg(char *filename, char **arguments){
 //this is where we will process and handle:
 
 
-void checkBareNames(arraylist_t *argList, int argsize){
+void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *inputFile){
 
     char **arguments = argList->data;
     
@@ -89,7 +124,7 @@ void checkBareNames(arraylist_t *argList, int argsize){
     
     //if the current program is in "/usr/local/bin/" then execute it
     if (access(check1, F_OK) == 0){
-        execProg(check1, arguments);
+        execProg(check1, arguments, outputFile, inputFile);
         free(check1); //free check1 string and return 
         return;
     } else {
@@ -109,7 +144,7 @@ void checkBareNames(arraylist_t *argList, int argsize){
 
     //check if program is in "/usr/bin"
     if (access(check2, F_OK) == 0){
-        execProg(check2, arguments); //execute
+        execProg(check2, arguments, outputFile, inputFile); //execute
         free(check2);
         return;
     } else {
@@ -129,7 +164,7 @@ void checkBareNames(arraylist_t *argList, int argsize){
 
     //check if curr prog is in "/bin"
     if (access(check3, F_OK) == 0){
-        execProg(check3, arguments); //execute
+        execProg(check3, arguments, outputFile, inputFile); //execute
         free(check3);
         return;
     } else{
@@ -151,6 +186,10 @@ int processArgs(arraylist_t *arguments){
     if (!(filename)){
         return argsize;
     } 
+    if (strcmp(filename, "exit") == 0){
+        printf("Exiting...\n");
+        exit(1);
+    }
 
     
     /* WILD CARD EXPANSION HERE*/
@@ -173,17 +212,81 @@ int processArgs(arraylist_t *arguments){
     //Add Null to end of argument list to denote the end of the list (this is needed for execv)
     //arguments[argsize] = NULL; 
     al_push(arguments, NULL);
-    
-    //if the user types "exit", exit out of the shell
-    if (strcmp(filename, "exit") == 0){
-        printf("Exiting...\n");
-        exit(1);
+
+    int redirectFlag = 0;
+    char *outputFile = NULL;
+    char *inputFile = NULL;
+    arraylist_t *list = al_create(100);
+
+    for (int i = 0; i < argsize; i++){
+        if (arguments->data[i] == NULL){continue;}
+        if (strcmp(arguments->data[i], ">")==0 && arguments->data[i+1] != NULL)
+        {
+            //printf("Found >\n");
+            redirectFlag = 1;
+            outputFile = arguments->data[i+1];
+            //printf("Current Output File: %s\n", outputFile);
+            //printf("Index: %d\n", i);
+            i = i+1;
+        }
+        else if (strcmp(arguments->data[i], "<")==0 && arguments->data[i+1] != NULL)
+        {
+            //printf("Found >\n");
+            redirectFlag = 1;
+            inputFile = arguments->data[i+1];
+            //printf("Current Input File: %s\n", inputFile);
+            i = i+1;
+        }
+        else{
+            al_push(list, arguments->data[i]);
+            //printf("Pushed %s\n", arguments[i]);
+        } 
     }
+
+    char *n;
+    int newLength = al_length(list);
+    int k = newLength-1;
+    //printf("AL length: %d\n", al_length(list));
+    
+    arraylist_t *truncArgs = al_create(sizeof(arguments->data[0])*(newLength+2));
+    while ((n = al_pop(list)) != NULL) {
+	    //printf("Popped %s\n", n);
+        //truncArgs->data[k] = n;
+        truncArgs->data[k] = malloc(strlen(n) + 1);
+        strcpy(truncArgs->data[k], n);
+        truncArgs->length = truncArgs->length + 1;
+        k = k-1;
+    }
+   
+    //al_destroy(list);
+    //free(list);
+    al_push(truncArgs, NULL);
+    
+
+   if (redirectFlag == 1){
+      
+        //free(arguments);
+        
+        arguments->data = truncArgs->data;
+        arguments->length = truncArgs->length - 1;
+        arguments->size = truncArgs->size;
+        //free(truncArgs);
+        
+    } else{
+        for (int i = 0; i < truncArgs->length; i++){
+            free(truncArgs->data[i]);
+        }
+        al_destroy(truncArgs);
+        free(truncArgs);
+    }
+
+    //if the user types "exit", exit out of the shell
+    
 
     //create the "left half" pipe argument list
     arraylist_t *pipeArgList = al_create(100);
     
-    for(int i = 0; i < argsize ; i++){
+    for(int i = 0; i < arguments->length; i++){
         if (arguments->data[i] == NULL) {continue;} //handle case where curr element is NULL
         for(int j = 0; j < strlen(arguments->data[i]); j++){
             //if you encounter a '|' char
@@ -200,6 +303,7 @@ int processArgs(arraylist_t *arguments){
                 pipeOutput.length = argsize - i;
                 //execute the left and right side commands
                 execPipe(pipeArgList, &pipeOutput, i, argsize);
+
                 return argsize;
             }
         }
@@ -210,21 +314,16 @@ int processArgs(arraylist_t *arguments){
         
     }
 
-    //free the pipeArgList array 
-    for (int i = 0; i < pipeArgList->length; i++){
-        free(pipeArgList->data[i]);
-    }
-    al_destroy(pipeArgList);
-    free(pipeArgList);
-
-
+ 
     
+
     
     /*EXECTUION OF LOCAL PROGRAMS*/
     //check if first argument contains a '/' this indicates that this will be local program
+    filename = arguments->data[0];
     for (int i = 0; i < strlen(filename); i++){
         if(filename[i] == '/'){
-            execProg(filename, arguments->data); //execute program 
+            execProg(filename, arguments->data, outputFile, inputFile); //execute program 
             return argsize;
         }
     }
@@ -233,8 +332,20 @@ int processArgs(arraylist_t *arguments){
     
 
     /*BARENAME CHECK HERE*/
-    checkBareNames(arguments, argsize);
+    checkBareNames(arguments, argsize, outputFile, inputFile);
+
+    for (int i = 0; i < arguments->length; i++){
+        free(arguments->data[i]);
+    }
+    for (int i = 0; i < pipeArgList->length; i++){
+        free(pipeArgList->data[i]);
+    }
+
     
+
+    al_destroy(pipeArgList);
+    free(pipeArgList);
+
     return argsize;
 }
 
@@ -277,11 +388,15 @@ void acceptArgs(char *buf, int bytes){
     processArgs(argList);
     
     //free the argument list 
+    
+    /*
     for (int i = 0; i < argList->length; i++){
         free(argList->data[i]);
     }
     al_destroy(argList);
-    free(argList);
+    free(argList); */
+    
+    
 }
 
 int main(int argc, char **argv){
