@@ -1,9 +1,5 @@
-this is one line
 ls .
-cat testsh.c 
-
-
-
-
-
-
+cat arraylist.c 
+ls | sort 
+echo hello > hello.txt 
+ls *.c 

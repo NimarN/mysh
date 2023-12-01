@@ -110,9 +110,12 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, arra
                     match = malloc(strlen(direntName)+1);
                     strcpy(match, direntName);
 
-                    for (int i = argsize-1; i>=position; i--)
+                    for (int i = argsize - 1; i>=position; i--)
                     {
                         //free(argumentList[i]);
+                        //printf("curr: %s \n", argumentList[i]);
+                        
+                        //printf("prev: %s \n", argumentList[i - 1]);
                         argumentList[i] = argumentList[i-1];
                     }
                     //free(argumentList[position]);
