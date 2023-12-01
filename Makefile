@@ -14,4 +14,4 @@ mysh.o: mysh.c wildcard.c  arraylist.h
 	$(CC) $(CFLAGS) mysh.c wildcard.c -c mysh.c
 
 clean:
-	rm -f *.o
+	rm -f mysh *.o

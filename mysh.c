@@ -12,8 +12,16 @@
 #include "mysh.h"
 
 #define BUFSIZE 1000
-#define BYTES 1
 
+
+//This will record the status of any executed program
+//1 if it exits normally, 0 if signaled/exits with error
+int statusFlag;
+
+//----------------------------------------------------------------------------------------//
+
+
+//execPipe will execute a pipe
 void execPipe(arraylist_t *pipeArgs, arraylist_t *pipeOut, int pipeArgsSize, int argsize){
     
     int fd[2]; //declare read and write end of pipe
@@ -21,7 +29,7 @@ void execPipe(arraylist_t *pipeArgs, arraylist_t *pipeOut, int pipeArgsSize, int
     
     /*EXECUTE LEFT HALF OF PIPE COMMAND*/
     if (fork() == 0){
-        //child
+        //this is the child
         dup2(fd[1], STDOUT_FILENO); //set stdout to the write end of pipe
         processArgs(pipeArgs); //execute the left half of the pipe command
         exit(1);
@@ -30,6 +38,7 @@ void execPipe(arraylist_t *pipeArgs, arraylist_t *pipeOut, int pipeArgsSize, int
    
    /*EXECUTE RIGHT HALF OF PIPE COMMAND*/
     if (fork() == 0){
+        //this is the child
         dup2(fd[0], STDIN_FILENO); //set stdin to read end of pipe
         processArgs(pipeOut); //execute the right half of the pipe command
     }
@@ -45,6 +54,10 @@ void execPipe(arraylist_t *pipeArgs, arraylist_t *pipeOut, int pipeArgsSize, int
 
 }
 
+
+//******************************************************************************************//
+
+
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
 void execProg(char *filename, char **arguments, char *outputFile, char *inputFile){
 
@@ -52,63 +65,70 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
     pid_t pid = fork();
 
     if (pid == 0){
-        //run the requested file and pass in the argument list
-
         // Child process
+        
+        // check that output and input files are not null
         if (outputFile!=NULL)
         {
+            //set fd
             int fd = open(outputFile,O_CREAT | O_TRUNC | O_WRONLY, 0640);
+            
             //Sets standardout to the fd of outputfile.
-            //printf("fd: %d", fd);
             dup2(fd, STDOUT_FILENO);
             close(fd);
         }
+
         if (inputFile != NULL)
-        {
-            //close(STDIN_FILENO);
+        {   
+            //set fd
             int fd = open(inputFile, O_RDONLY, S_IWUSR | S_IRUSR);
+            
             //Sets standardout to the fd of outputfile.
-            //printf("fd: %d", fd);
             dup2(fd, STDIN_FILENO);
             close(fd);
         }
+        
+        //execute the program
         execv(filename, arguments);
       
         //child should not reach here , if it does, print error and exit
         printf("whoooops! error"); 
         exit(1);
     }
+
     else if (pid > 0){
-        int child_status;
-        wait(&child_status);
+        int child_status; //declare child status
+        wait(&child_status); //wait for the chi;d
+        
+        //if you exit the child normally
+        if (WIFEXITED(child_status)){ 
+            //check if exit was succesful
+            if (WEXITSTATUS(child_status) == 0) { 
+                statusFlag = 1;  //if exit succesfully, set status flag to 1
+            } else {
+                // Child process exited with an error
+                statusFlag = 0; //set status flag to 0 if exiting with an error
+            }
+            //set the status flag to 1
+        }
+        else if (WIFSIGNALED(child_status)){
+            statusFlag = 0; //if exiting with a signal set status flag to 0;
+        }
         return;
     } 
     else {
+        //otherwise you failed to fork 
         perror("fork failed");
+        return;
     }
 }
 
-void freeList(char **argList, int truncSize)
-{
-    //free each object in the argument list
-    for(int i = 0; i < truncSize; i++){
-        free(argList[i]);
-    }
-    //free the argument list itself
-    free(argList);
-    return;
-}
-
-
-//processArgs() determines what the argument list consists of 
-//this is where we will process and handle:
-
+//********************************************************************************************//
 
 void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *inputFile){
 
     char **arguments = argList->data;
-    
-    
+
     //If the first argument is not a shell built in or a local program, it is a barename 
     char *filename = arguments[0];
     if (filename == NULL) {return;}
@@ -174,30 +194,95 @@ void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *i
 
 }
 
+//********************************************************************************************//
+
+
 /*Process args will process the actual commands*/
 int processArgs(arraylist_t *arguments){
 
     //set the first argument to filename
     char *filename = arguments->data[0];
     
-    
     //set argument size
     int argsize = arguments->length;
 
-    
     //check that the provided file is not null
     if (!(filename )){
         return argsize;
     } 
 
 
+    /**** CONDITIONALS HERE ****/
+    if (strcmp(filename, "then") == 0){
+        
+        //if the status flag is not 1 (previous command failed) return immedeatly
+        if (statusFlag != 1) return argsize;
+
+        //otherwise set conditionalArgs argument list
+        arraylist_t *conditionalArgs = al_create(800);
+
+        //iterate through arguments starting from after "then"
+        for (int i = 1; i < arguments->length; i++){
+            
+            //creating argument
+            char *arg = malloc(strlen(arguments->data[i]) + 1);
+            
+            //copy contents and push intp argument list
+            strcpy(arg, arguments->data[i]);
+            al_push(conditionalArgs, arg);
+        }
+
+        //call process args with new arglist
+        processArgs(conditionalArgs);
+
+        //free what was in conditionalArgs array
+        for (int i = 0; i < conditionalArgs->length; i++){
+            free(conditionalArgs->data[i]);
+        }
+        al_destroy(conditionalArgs);
+        free(conditionalArgs);
+
+        return argsize;
+    
+    } else if (strcmp(filename, "else") == 0){ //if you find an "else"
+        
+        //check status flag of previous command
+        //if exited normally , return immeadeatly 
+        if (statusFlag != 0) return argsize;
+
+        //create new argument list
+        arraylist_t *conditionalArgs = al_create(800);
+
+        //copy whatever was in arguments after "else" and add to the argument list
+        for (int i = 1; i < arguments->length; i++){
+            char *arg = malloc(strlen(arguments->data[i]) + 1);
+            
+            strcpy(arg, arguments->data[i]);
+            al_push(conditionalArgs, arg);
+        }
+
+        //process the new argument list
+        processArgs(conditionalArgs);
+        
+        //free what was in conditionalArgs array
+        for (int i = 0; i < conditionalArgs->length; i++){
+            free(conditionalArgs->data[i]);
+        }
+        al_destroy(conditionalArgs);
+        free(conditionalArgs);
+
+        return argsize;
+        
+    }
+
+    /**** EXITING HERE ****/
+    //If first argument is exit then exit immeadeatly
     if (strcmp(filename, "exit") == 0){
         printf("Exiting...\n");
         exit(1);
     }
 
-    
-    /* WILD CARD EXPANSION HERE*/
+    /**** WILD CARD EXPANSION HERE ****/
     //once the argument list has been expanded, we can handle all other cases 
    
     for (int i=1; i < argsize ;i++)
@@ -207,19 +292,19 @@ int processArgs(arraylist_t *arguments){
         if (strchr(arguments->data[i], '*')!=NULL)
         {
             argsize = startExpansion(arguments->data[i], *arguments, arguments->data, i, argsize);
-            //printf("finished expansion");
         }
-    } 
-    
+    }
+   
     //update array length to argsize
     arguments->length = argsize;
-
 
     //Add Null to end of argument list to denote the end of the list (this is needed for execv)
     //arguments[argsize] = NULL; 
     al_push(arguments, NULL);
 
-    /*PIPING OVER HERE*/
+    /**** PIPING OVER HERE ****/
+    //create the pipeArgList, this will hold the right side of the command '|'
+    // ex:    <pipeArgList> | <pipeOutputData>
     arraylist_t *pipeArgList = al_create(800);
     
     for(int i = 0; i < arguments->length; i++){
@@ -250,75 +335,77 @@ int processArgs(arraylist_t *arguments){
         
     }
 
+    /**** REDIRECTING HERE ****/
+    
+    //redirect flag will determine if there was a redirect char, needed to determine when to free memory
     int redirectFlag = 0;
+
+    //output and input files for the redirect
     char *outputFile = NULL;
     char *inputFile = NULL;
+
     arraylist_t *list = al_create(100);
 
     for (int i = 0; i < argsize; i++){
         if (arguments->data[i] == NULL){continue;}
         if (strcmp(arguments->data[i], ">")==0 && arguments->data[i+1] != NULL)
-        {
-            //printf("Found >\n");
-            redirectFlag = 1;
-            outputFile = arguments->data[i+1];
-            //printf("Current Output File: %s\n", outputFile);
-            //printf("Index: %d\n", i);
+        {   
+            //when we encounter a ">"
+            redirectFlag = 1; //set redirect flag
+            outputFile = malloc(strlen(arguments->data[i+1]) + 1); //allocate size for outputFile
+            strcpy(outputFile, arguments->data[i+1]); //copy name of output file over
             i = i+1;
         }
         else if (strcmp(arguments->data[i], "<")==0 && arguments->data[i+1] != NULL)
         {
-            //printf("Found >\n");
-            redirectFlag = 1;
-            inputFile = arguments->data[i+1];
-            //printf("Current Input File: %s\n", inputFile);
+            //when we encounter a "<"
+            redirectFlag = 1; //set redirect flag
+            inputFile = malloc(strlen(arguments->data[i+1]) + 1); //allocate size for inputFile
+            strcpy(inputFile, arguments->data[i+1]); //copy name of input file over
             i = i+1;
         }
         else{
             al_push(list, arguments->data[i]);
-            //printf("Pushed %s\n", arguments[i]);
         } 
     }
 
+    //n hold the buffer that will hold the return value of al_pop
     char *n;
+    //get length of curr list
     int newLength = al_length(list);
     int k = newLength-1;
-    //printf("AL length: %d\n", al_length(list));
     
+    //create truncArgs array which will hold what was before the redirect
     arraylist_t *truncArgs = al_create(sizeof(arguments->data[0])*(newLength+2));
     while ((n = al_pop(list)) != NULL) {
-	    //printf("Popped %s\n", n);
-        //truncArgs->data[k] = n;
         truncArgs->data[k] = malloc(strlen(n) + 1);
         strcpy(truncArgs->data[k], n);
         truncArgs->length = truncArgs->length + 1;
         k = k-1;
     }
    
-    //al_destroy(list);
-    //free(list);
-    al_push(truncArgs, NULL);
+    //Null terminate truncArgs to denote end of list (need for exec)
+    al_push(truncArgs, NULL); 
     
-
-   if (redirectFlag == 1){
+    //if we have redirecton
+    if (redirectFlag == 1){
+        //free the contents of arguments, we will build new argument list from truncArgs
+        for(int i = 0; i < arguments->length; i++){
+            free(arguments->data[i]);
+        }
+        al_destroy(arguments);
       
         al_destroy(list);
         free(list);
 
-        for (int i = 0; i < arguments->length; i++){
-            free(arguments->data[i]);
-        }
-        al_destroy(arguments);
-
-        
-        
-        arguments->data = truncArgs->data;
-        arguments->length = truncArgs->length - 1;
-        arguments->size = truncArgs->size;
+        arguments->data = truncArgs->data; //set data of arguments to truncArgs data
+        arguments->length = truncArgs->length - 1; //set length
+        arguments->size = truncArgs->size; //set size
         free(truncArgs);
         
     } else{
-
+        
+        //If no redirection present, free and destroy truncArgs
         al_destroy(list);
         free(list);
 
@@ -329,13 +416,11 @@ int processArgs(arraylist_t *arguments){
         free(truncArgs);
     }
 
-    //if the user types "exit", exit out of the shell
     
 
-    //create the "left half" pipe argument list
-    
 
-    /*EXECTUION OF LOCAL PROGRAMS*/
+
+    /**** EXECTUION OF LOCAL PROGRAMS ****/
     //check if first argument contains a '/' this indicates that this will be local program
     filename = arguments->data[0];
     for (int i = 0; i < strlen(filename); i++){
@@ -345,12 +430,15 @@ int processArgs(arraylist_t *arguments){
         }
     }
 
-    /*SHELL BUILT INS HERE*/
+    /**** SHELL BUILT INS HERE ****/
     
 
-    /*BARENAME CHECK HERE*/
+    /**** BARENAME CHECK HERE ****/
     checkBareNames(arguments, argsize, outputFile, inputFile);
 
+    /**** free whatever is still not freed ****/
+    if (inputFile != NULL) free(inputFile);
+    if (outputFile != NULL) free(outputFile);
     for (int i = 0; i < pipeArgList->length; i++){
         free(pipeArgList->data[i]);
     }
@@ -362,6 +450,8 @@ int processArgs(arraylist_t *arguments){
 }
 
 
+//********************************************************************************************//
+
 
 //acceptArgs will iterate through the buffer and collect a sequence of tokens (arguments)
 void acceptArgs(char *buf, int bytes){
@@ -369,35 +459,76 @@ void acceptArgs(char *buf, int bytes){
     arraylist_t *argList = al_create(800);
     if (buf[0] == 0 ) return;
     
-    
-    
     //ensure the array list was created properly
     if (argList == NULL){
         exit(1);
     }
     
-    int start = 0; 
+    int start = 0;  
     for (int i = 0; i < bytes; i++){
         //if you encounter a space, this marks the end of a single argument
         if (i > 0 && isspace(buf[i]) && !(isspace(buf[i - 1]))){ 
-            char *arg = malloc(i - start + 1); //allocate space for the current argument
-
-            memcpy(arg, buf + start, i - start); //copy the argument from buf to arg
             
-            //check that the current argument isn't a space or newline
+            char *arg = malloc(i - start + 1); //allocate space for the current argument
+           
             if (*arg == 32 ){
                 start = i + 1;
                 continue;
             } 
-
-            //null terminate the argument
-            arg[i -  start] = '\0'; 
             
+            memcpy(arg, buf + start, i - start);
+            
+            arg[i -  start] = '\0';
 
-            //add argument to arraylist
-            al_push(argList, arg);
+            //token flag will check if we encounter a redirect or pipe without spaces around it
+            //this is to ensure that we dont double push into arg array
+            int tokenFlag = 0; 
+           
+            for (int i = 0; i < strlen(arg); i++){
+                //if we get any of > < or |
+                if (arg[i] == '>' || arg[i] == '<' || arg[i] =='|'){
+                    //just checking that we are in bounds
+                    if (i - 1 >= 0 && i + 1 <= strlen(arg)){
+                        tokenFlag = 1;
+                        
+                        // command would be: <prev> <comm> <after> where <comm> is any of < > or |
+                        
+                        //prev holds whatever is before a redirect or pipe
+                        char *prev = malloc(i + 1); //space allocation
+                        memcpy(prev, arg, i); //copy content
+                        prev[i] = '\0'; //null terminate
+                        
+                        //after would hold whatever is after a redirect or pipe
+                        char *after = malloc(strlen(arg) - i + 1); //space allocation
+                        memcpy(after, arg + i + 1, strlen(arg) - i); //copy content
+                        after[strlen(arg) - i ] = '\0'; //null terminate
+                        
+                        //comm will hold either a ">" or "<" or "|"
+                        char *comm = malloc(2); //space allocation (2 because one byte for char, one for null term)
+                        memcpy(comm, arg + i, 1); //copy over
+                        comm[1] = '\0'; //null terminate
+                        
+                        //push into argList in this order 
+                        al_push(argList, prev);
+                        al_push(argList, comm);
+                        al_push(argList, after);
+                        
+                        break; //break 
+                    
+                    } else {
+                        break; //break 
+                    }          
+                }
+            }
+            
+            //if token flag is 0 then no redirection or pipes present, thus push arg normally
+            if (tokenFlag == 0){
+                al_push(argList, arg);
+            } else{
+                //otherwise if there was a redirect or pipe then free arg (we didnt need it since we broke it up)
+                free(arg);
+            }
             start = i + 1; //update start 
-            
         }
     }
 
@@ -405,7 +536,6 @@ void acceptArgs(char *buf, int bytes){
     processArgs(argList);
     
     //free the argument list 
-
     for (int i = 0; i < argList->length; i++){
         free(argList->data[i]);
     }
@@ -415,7 +545,13 @@ void acceptArgs(char *buf, int bytes){
     return;
 }
 
+//********************************************************************************************//
+
+
 int main(int argc, char **argv){
+    
+    //initialize the previous process exit flag
+    statusFlag = 1;
     
     char *greeting = "Welcome to mysh! :) \n"; //print greeting
     int fd, command_length, bytes, start = 0;
@@ -424,8 +560,6 @@ int main(int argc, char **argv){
     int bytesLeftover = 0;
 
     write(1, greeting, strlen(greeting)); //write the greeting to stdout
-    
-    
     
     //Check is user provides a file for batch mode, open if file provided
     if (argc > 1){
@@ -447,8 +581,6 @@ int main(int argc, char **argv){
         if (bytes == 0){
             exit(EXIT_SUCCESS);
         }
-        
-        
         
         /* THIS IS FOR BATCH MODE !!*/
         if (fd != 0){ 
