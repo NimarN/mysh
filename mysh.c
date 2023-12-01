@@ -61,9 +61,10 @@ void execPipe(arraylist_t *pipeArgs, arraylist_t *pipeOut, int pipeArgsSize, int
 
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
 void execProg(char *filename, char **arguments, char *outputFile, char *inputFile, char *cwd, int argsize){
+    
 
-    int stdinfd = dup(0);
-    int stdoutfd = dup(1); 
+    /*int stdinfd = dup(0);
+    int stdoutfd = dup(1); */
     //initialize process id and fork()
     pid_t pid = fork();
     //uncommenting below makes the output redirect work
@@ -98,19 +99,17 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
 
         if (strcmp(arguments[0], "pwd") == 0) {
             // pwd command
-            printf("BuiltIn PWD: %s\n", cwd);
-            //int stdInFd = STDIN_FILENO;
-            dup2(stdinfd, 0);
-            close(stdinfd);
-            dup2(stdoutfd, 1);
-            close(stdoutfd);
+            write(1, "Built in PWD: ", strlen("Built in PWD: "));
+            write(1, cwd, strlen(cwd));
+            write(1, "\n", strlen("\n\0"));
+          
             //success
             exit(1);
         }
 
         if (strcmp(arguments[0], "which") == 0) {
             // which command
-            if (argsize == 2)
+            if (argsize >= 2)
             {
                 char *filename2 = arguments[1];
 
@@ -119,9 +118,11 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
                 memcpy(check1 + strlen("/usr/local/bin/"), filename2, strlen(filename2));
                 check1[strlen("/usr/local/bin/") + strlen(filename2)] = '\0';
                 
-                //if the current program is in "/usr/local/bin/" then execute it
+                
                 if (access(check1, F_OK) == 0){
-                    printf("BuiltIn Which: %s\n", check1);
+                    write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
+                    write(1, check1, strlen(check1));
+                    write(1, "\n", strlen("\n\0"));
                     free(check1); //free check1 string and return 
                     exit(1);
                 } else {
@@ -136,12 +137,11 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
 
                 //check if program is in "/usr/bin"
                 if (access(check2, F_OK) == 0){
-                    printf("BuiltIn Which: %s\n", check2);
+                    write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
+                    write(1, check2, strlen(check2));
+                    write(1, "\n", strlen("\n\0"));
                     free(check2);
-                    dup2(stdinfd, 0);
-                    close(stdinfd);
-                    dup2(stdoutfd, 1);
-                    close(stdoutfd);
+                    
                     exit(1);
                 } else {
                     free(check2);
@@ -154,33 +154,22 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
 
                 //check if curr prog is in "/bin"
                 if (access(check3, F_OK) == 0){
-                    printf("BuiltIn Which: %s\n", check3);
-                    free(check3);
-                    dup2(stdinfd, 0);
-                    close(stdinfd);
-                    dup2(stdoutfd, 1);
-                    close(stdoutfd);
+                    write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
+                    write(1, check3, strlen(check3));
+                    write(1, "\n", strlen("\n\0"));
+                    
                     exit(1);
                 } else{
                     free(check3);
                 }
                 //printf("BuiltIn Which: %s\n", filename);
-
                 //fail
-                dup2(stdinfd, 0);
-                close(stdinfd);
-                dup2(stdoutfd, 1);
-                close(stdoutfd);
+                
                 exit(0);
             }
             else
             {
-                //int stdInFd = STDIN_FILENO;
-                //fail
-                dup2(stdinfd, 0);
-                close(stdinfd);
-                dup2(stdoutfd, 1);
-                close(stdoutfd);
+
                 exit(0);
             }
         }
