@@ -1,1 +1,3 @@
-cat arraylist.h
+ls .
+cat arraylist.c 
+ls | sort 

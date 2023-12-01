@@ -1,1 +1,10 @@
-cat
+arraylist.c
+duptest1.c
+duptest2.c
+hello.c
+lines.c
+mysh.c
+numbers.c
+shownums.c
+testshcopy.c
+wildcard.c
