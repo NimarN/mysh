@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <linux/limits.h>
 
 #include "wildcard.h"
 #include "mysh.h"
@@ -46,11 +47,15 @@ void execPipe(arraylist_t *pipeArgs, arraylist_t *pipeOut, int pipeArgsSize, int
 }
 
 //execProg() will execute a file and it given a filename/pathname and a list of arguments
-void execProg(char *filename, char **arguments, char *outputFile, char *inputFile){
+void execProg(char *filename, char **arguments, char *outputFile, char *inputFile, char *cwd, int argsize){
 
+    int stdinfd = dup(0);
+    int stdoutfd = dup(1);
     //initialize process id and fork()
     pid_t pid = fork();
-
+    //printf("Path: %s\n", filename);
+    //printf("outputFile: %s\n", outputFile);
+    //printf("inputFile: %s\n", inputFile);
     if (pid == 0){
         //run the requested file and pass in the argument list
 
@@ -72,8 +77,108 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
             dup2(fd, STDIN_FILENO);
             close(fd);
         }
-        execv(filename, arguments);
-      
+        if (strcmp(arguments[0], "pwd") == 0) {
+            // pwd command
+            printf("BuiltIn PWD: %s\n", cwd);
+            //int stdInFd = STDIN_FILENO;
+            dup2(stdinfd, 0);
+            close(stdinfd);
+            dup2(stdoutfd, 1);
+            close(stdoutfd);
+            //success
+            exit(0);
+        }
+        else if (strcmp(arguments[0], "which") == 0) {
+            // which command
+            if (argsize == 2)
+            {
+                char *filename2 = arguments[1];
+
+                char *check1 = malloc(strlen("/usr/local/bin/") + strlen(filename2) + 1);
+                //copy over the path 
+                memcpy(check1, "/usr/local/bin/", strlen("/usr/local/bin/"));
+                //copy over the filename 
+                memcpy(check1 + strlen("/usr/local/bin/"), filename2, strlen(filename2));
+                //add null terminator to check1
+                check1[strlen("/usr/local/bin/") + strlen(filename2)] = '\0';
+                
+                //if the current program is in "/usr/local/bin/" then execute it
+                if (access(check1, F_OK) == 0){
+                    printf("BuiltIn Which: %s\n", check1);
+                    free(check1); //free check1 string and return 
+                    exit(0);
+                } else {
+                    // free check1 
+                    free(check1);
+                }
+
+                char *check2 = malloc(strlen("/usr/bin/") + strlen(filename2)+ 1 );
+                //copy over the path 
+                memcpy(check2, "/usr/bin/", strlen("/usr/bin/"));
+                //copy over the filename
+                memcpy(check2 + strlen("/usr/bin/"), filename2, strlen(filename2));
+                //add null term
+                check2[strlen("/usr/bin/") + strlen(filename2)] = '\0';
+
+                //check if program is in "/usr/bin"
+                if (access(check2, F_OK) == 0){
+                    printf("BuiltIn Which: %s\n", check2);
+                    free(check2);
+                    dup2(stdinfd, 0);
+                    close(stdinfd);
+                    dup2(stdoutfd, 1);
+                    close(stdoutfd);
+                    exit(0);
+                } else {
+                    free(check2);
+                }
+                
+                char *check3 = malloc(strlen("/bin/") + strlen(filename2) + 1);
+                //copy over the path 
+                memcpy(check3, "/bin/", strlen("/bin/"));
+                //copy over the filename
+                memcpy(check3 + strlen("/bin/"), filename2, strlen(filename2));
+                //add null term
+                check3[strlen("/bin/") + strlen(filename2)] = '\0';
+
+                //check if curr prog is in "/bin"
+                if (access(check3, F_OK) == 0){
+                    printf("BuiltIn Which: %s\n", check3);
+                    free(check3);
+                    dup2(stdinfd, 0);
+                    close(stdinfd);
+                    dup2(stdoutfd, 1);
+                    close(stdoutfd);
+                    exit(0);
+                } else{
+                    free(check3);
+                }
+                //printf("BuiltIn Which: %s\n", filename);
+
+                //fail
+                dup2(stdinfd, 0);
+                close(stdinfd);
+                dup2(stdoutfd, 1);
+                close(stdoutfd);
+                exit(EXIT_FAILURE);
+
+
+            }
+            else
+            {
+            //int stdInFd = STDIN_FILENO;
+            //fail
+            dup2(stdinfd, 0);
+            close(stdinfd);
+            dup2(stdoutfd, 1);
+            close(stdoutfd);
+            exit(EXIT_FAILURE);
+            }
+        }
+        else
+        {
+            execv(filename, arguments);
+        }
         //child should not reach here , if it does, print error and exit
         printf("whoooops! error"); 
         exit(1);
@@ -104,7 +209,7 @@ void freeList(char **argList, int truncSize)
 //this is where we will process and handle:
 
 
-void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *inputFile){
+void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *inputFile, char *cwd){
 
     char **arguments = argList->data;
     
@@ -124,7 +229,7 @@ void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *i
     
     //if the current program is in "/usr/local/bin/" then execute it
     if (access(check1, F_OK) == 0){
-        execProg(check1, arguments, outputFile, inputFile);
+        execProg(check1, arguments, outputFile, inputFile, cwd, argsize);
         free(check1); //free check1 string and return 
         return;
     } else {
@@ -144,7 +249,7 @@ void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *i
 
     //check if program is in "/usr/bin"
     if (access(check2, F_OK) == 0){
-        execProg(check2, arguments, outputFile, inputFile); //execute
+        execProg(check2, arguments, outputFile, inputFile, cwd, argsize); //execute
         free(check2);
         return;
     } else {
@@ -164,7 +269,7 @@ void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *i
 
     //check if curr prog is in "/bin"
     if (access(check3, F_OK) == 0){
-        execProg(check3, arguments, outputFile, inputFile); //execute
+        execProg(check3, arguments, outputFile, inputFile, cwd, argsize); //execute
         free(check3);
         return;
     } else{
@@ -186,6 +291,7 @@ int processArgs(arraylist_t *arguments){
     if (!(filename)){
         return argsize;
     } 
+    
     if (strcmp(filename, "exit") == 0){
         printf("Exiting...\n");
         exit(1);
@@ -213,10 +319,37 @@ int processArgs(arraylist_t *arguments){
     //arguments[argsize] = NULL; 
     al_push(arguments, NULL);
 
+    char cwd[PATH_MAX];
+    getcwd(cwd, sizeof(cwd));
+
+    //cd here
+    //printf("%d\n", argsize);
+    //printf("%s\n", arguments->data[0]);
+    if (argsize==2 && strcmp(arguments->data[0],"cd")==0)
+    {
+        if(chdir(arguments->data[1])==0)
+        {
+            getcwd(cwd, sizeof(cwd));
+            printf("success!\nCurrent Dir is: %s\n", cwd);
+            return argsize;
+        }
+        else{
+            getcwd(cwd, sizeof(cwd));
+            printf("fail!\nCurrent Dir is: %s\n", cwd);
+            return argsize;
+        }
+    }
+    else if (argsize!=2 && strcmp(arguments->data[0],"cd")==0)
+    {
+        printf("Wrong Number of Arguments for cd\n");
+        return argsize;
+    }
+
     int redirectFlag = 0;
     char *outputFile = NULL;
     char *inputFile = NULL;
     arraylist_t *list = al_create(100);
+    //printf("Got To Here\n");
 
     for (int i = 0; i < argsize; i++){
         if (arguments->data[i] == NULL){continue;}
@@ -257,6 +390,14 @@ int processArgs(arraylist_t *arguments){
         truncArgs->length = truncArgs->length + 1;
         k = k-1;
     }
+
+    //destroy arraylist_t list
+        
+        for (int i = 0; i < list->length; i++){
+            free(list->data[i]);
+        }
+        al_destroy(list);
+        free(list); 
    
     //al_destroy(list);
     //free(list);
@@ -314,34 +455,30 @@ int processArgs(arraylist_t *arguments){
         
     }
 
- 
-    
-
-    
     /*EXECTUION OF LOCAL PROGRAMS*/
     //check if first argument contains a '/' this indicates that this will be local program
     filename = arguments->data[0];
     for (int i = 0; i < strlen(filename); i++){
         if(filename[i] == '/'){
-            execProg(filename, arguments->data, outputFile, inputFile); //execute program 
+            execProg(filename, arguments->data, outputFile, inputFile, cwd, argsize); //execute program 
             return argsize;
         }
     }
 
     /*SHELL BUILT INS HERE*/
     
-
+    //printf("Argument List Before Barenames Check:\n");
     /*BARENAME CHECK HERE*/
-    checkBareNames(arguments, argsize, outputFile, inputFile);
-
+   //printf("Arguments length: %d\n", argsize);
     for (int i = 0; i < arguments->length; i++){
-        free(arguments->data[i]);
+        //printf("%d: %s\n", i, (arguments->data[i]));
     }
+
+    checkBareNames(arguments, argsize, outputFile, inputFile, cwd);
+
     for (int i = 0; i < pipeArgList->length; i++){
         free(pipeArgList->data[i]);
     }
-
-    
 
     al_destroy(pipeArgList);
     free(pipeArgList);
@@ -389,14 +526,14 @@ void acceptArgs(char *buf, int bytes){
     
     //free the argument list 
     
-    /*
+    
     for (int i = 0; i < argList->length; i++){
         free(argList->data[i]);
     }
     al_destroy(argList);
-    free(argList); */
+    free(argList); 
     
-    
+    return;
 }
 
 int main(int argc, char **argv){
@@ -439,7 +576,6 @@ int main(int argc, char **argv){
                     input = realloc(input, command_length + 1); //allocate space to hold command
                     memcpy(input, buf + start, command_length); //copy command into input
                     input[command_length] = '\0'; //null terminate the input 
-                    
                     acceptArgs(input, command_length);
                     
                     start = i + 1; //update start

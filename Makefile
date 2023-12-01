@@ -3,6 +3,8 @@ CFLAGS = -g -std=c99 -Wvla -Wall -fsanitize=address,undefined
 
 
 
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 arraylist.o: arraylist.c arraylist.h
 	$(CC) $(CFLAGS) -c arraylist.c
