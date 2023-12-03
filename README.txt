@@ -26,8 +26,7 @@ The process then repeats until the user runs exit or the process is terminated w
 
 Test Plan
 --------------------
-Our testing stategy was constantly and rigorously testing different possible scenarios after implementing each seperate part of 
-mysh. 
+Our testing stategy was constantly and rigorously testing different possible scenarios after implementing each seperate part of mysh. 
 We had test programs to make sure our spereate components worked before integrating them into the main mysh.c file. 
 We also created test files and test directories which we would use to test different commands of our shell. 
 As our shell got more complex we made sure to use test inputs that would comptehensively test a multitude of different functions together at once. 
