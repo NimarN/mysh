@@ -1,4 +1,4 @@
-CS214 | Project II: Word Occurence Count
+CS214 | Project III: My Shell
 Rutgers University | Fall 2023
 
 Collaborators
@@ -50,15 +50,26 @@ Barenames
 
 Built-in commands
 --------------------
-
+We implemented the CD command in the parent process and the PWD and WHICH commands in the child process. This allowed us to 
+redirect the output of PWD and WHICH if necessary, which we tested. CD does not have output and only accepts 1 argument, so we
+left it in the parent proecss. For all 3 BuiltIns, we created error checks for when they failed or if they were used incorrectly
+when the user ran the command. 
 
 Wildcards
 --------------------
+To implement wildcard expansion, we searched the appropriate directory for entries that contained a matching prefix and suffix
+(which are the characters around the wildcard) for any arguments containing a wildcard. These were then input into the argument list
+where the wildcard was found, maintaining argument order. If there are no matches to the wildcard, it is returned as normal with
+no replacements.
 
 
 Redirection
 --------------------
-
+For redirection, we parsed through the argument list and when we found a < or > symbol with an argument after it, we removed both
+the redirect symbol and the filename after it from the argument list, storing the filename as either an output or input file.
+If multiple redirects of the same type were found, we replaced old input/outfiles with new ones. These were fed as parameters
+to our function which executed commands, so the child process could accurately change stdinput or stdoutput to be those files.
+These changed file descriptors were then either reset by execv or manually by mysh.c for the builtins. 
 
 Pipelines
 --------------------
@@ -68,20 +79,20 @@ Conditionals
 --------------------
 
 
-execPipe()
---------------------
-
-
 
 Mysh.c
 --------------------
-
+This is the main code file which contains all methods used by our shell program, which also contains a header file to import our
+wildcard implementation functions. It takes input, parses it, tokenizes it, and does all things described within "Our Implementation"
 
 
 Wildcard.c
 --------------------
+This C file contains the functions to execute wildcard expansion. It searches the required directory for entries matching the expansion,
+and correctly inserts them into an arrayList struct given by mysh.c.
 
 
+///**We Lowkey dont need to elaborate on all of these functions below but they are here***////
 
 execPipe()
 --------------------
@@ -102,9 +113,6 @@ processArgs()
 acceptArgs
 --------------------
 
-
-execPipe()
---------------------
 
 
 
