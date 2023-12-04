@@ -67,7 +67,7 @@ int matchesSuffix (char *dirent, char *suffix)
 }
 
 //Only touching this method
-int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, arraylist_t *argArray, int position, int argsize)
+int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, arraylist_t *argArray, int position, int argsize, int pathProvidedFlag, char *path)
 {
     char **argumentList = argArray-> data;
     //printf("AL Before: ");
@@ -90,15 +90,27 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, arra
             matchesSuffix(direntName, suffix);
             if (matchesPrefix(direntName, prefix)==1 && matchesSuffix(direntName, suffix)==1)
             {
-                //printf("WC: %s\n", direntName);
                 if (firstMatch == 0)
                 {
-                    match = malloc(strlen(direntName)+1);
-                    strcpy(match, direntName);
-                    free(argumentList[position]);
-                    argumentList[position] = match;
-                    firstMatch = 1;
-                    position = position+1;
+                    if (pathProvidedFlag == 1){
+
+                        match = malloc(strlen(direntName) + strlen(path) + 1);
+                        memcpy(match, path, strlen(path));
+                        memcpy(match + strlen(path), direntName, strlen(direntName));
+                        match[strlen(direntName) + strlen(path)] = '\0';
+                        free(argumentList[position]);
+                        argumentList[position] = match;
+                        firstMatch = 1;
+                        position = position+1;
+                    }
+                    else{
+                        match = malloc(strlen(direntName)+1);
+                        strcpy(match, direntName);
+                        free(argumentList[position]);
+                        argumentList[position] = match;
+                        firstMatch = 1;
+                        position = position+1;
+                    }  
                 }
                 else
                 {
@@ -107,8 +119,17 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, arra
                     position = position+1;
 
                     //What ever is malloced from here leaks...
-                    match = malloc(strlen(direntName)+1);
-                    strcpy(match, direntName);
+                    if (pathProvidedFlag){
+                        match = malloc(strlen(direntName) + strlen(path) + 1);
+                        memcpy(match, path, strlen(path));
+                        memcpy(match + strlen(path), direntName, strlen(direntName));
+                        match[strlen(direntName) + strlen(path)] = '\0';
+                    }
+                    else {
+                        match = malloc(strlen(direntName)+1);
+                        strcpy(match, direntName);
+                    }
+                    
 
                     for (int i = argsize - 1; i>=position; i--)
                     {
@@ -128,11 +149,7 @@ int printWildcards(DIR *dirPtr, char *pathname, char *prefix, char *suffix, arra
         //uncomment to print all directory entries
         //printf("%s\n", direntName);
     }
-    //printf("AL After: ");
-    /*for (int i = 0; i < argsize; i++){
-        printf("%s ", argumentList[i]);
-    }*/
-    //printf("\n");
+    
 
     return argsize;
 }
@@ -158,7 +175,7 @@ char *stringAfterWildCard(char *argWithWilcard, int wildcardIndex)
 
 
 //Only call this function once we confirm the parameter has exactly 1 wildcard.
-int startExpansion(char *argWithWildcard, arraylist_t argArray, char **argumentList, int position, int argsize)
+int startExpansion(char *wildCardArg, arraylist_t argArray, char **argumentList, int position, int argsize)
 {
 
     //Eventually will make main a function that takes an argument with wildcard as parameter.
@@ -166,17 +183,49 @@ int startExpansion(char *argWithWildcard, arraylist_t argArray, char **argumentL
     
     //stores current working directory in char *cwd
     char cwd[PATH_MAX];
+    char *argWithWildcard;
 
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+    char *providedPath = NULL;
+    int pathProvidedFlag = 0;
+    int charsAfterSlash = 0;
+    for (int i = 0; i < strlen(wildCardArg); i++){
+
+        if(wildCardArg[i] == '/'){
+            pathProvidedFlag = 1;
+            charsAfterSlash = 0;
+        } 
+        else if (wildCardArg[i] == '*' && pathProvidedFlag == 1){
+            providedPath = malloc(i - charsAfterSlash + 1);
+            memcpy(providedPath, wildCardArg, i - charsAfterSlash);
+            providedPath[i - charsAfterSlash] = '\0';
+            argWithWildcard = wildCardArg + i - (charsAfterSlash);
+            //printf("arg with wildcard: %s\n", argWithWildcard);
+            //printf("Provided Path: %s\n", providedPath);
+            break;
+        }
+        else {
+            charsAfterSlash++;
+        }
+    }
+
+    DIR *dirPtr;
+    char* path;
+    
+    if (providedPath != NULL){
+        path = providedPath;
+        //printf("path provided !\n");
+    }
+    else if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        path = cwd;
+        strcat(path, "/");
+        argWithWildcard = wildCardArg;
         //printf("Current working dir: %s\n", cwd);
     } else {
         perror("getcwd() error");
         //return;
-    }
+    } 
 
-    DIR *dirPtr;
-    char* path = cwd;
-    strcat(path, "/");
+    
 
     //testing 
     char *wildcardLocation = strchr(argWithWildcard, '*');
@@ -193,10 +242,11 @@ int startExpansion(char *argWithWildcard, arraylist_t argArray, char **argumentL
     //printf("Sufix: %s\n", suffix);
 
     dirPtr = opendir(path);
-    argsize = printWildcards(dirPtr, argWithWildcard, prefix, suffix, &argArray, position, argsize);
+    argsize = printWildcards(dirPtr, argWithWildcard, prefix, suffix, &argArray, position, argsize, pathProvidedFlag, path);
     closedir(dirPtr);
+    free(providedPath);
     free(prefix);
     free(suffix);
 
     return argsize;
-}
+} 
