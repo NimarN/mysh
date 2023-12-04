@@ -705,7 +705,7 @@ int main(int argc, char **argv){
     int bytesLeftover = 0;
 
     
-    
+    write(1, "\033[01;37m", strlen("\033[01;37m"));
     write(1, icon, strlen(icon)); //write the greeting to stdout
     write(1, "\033[0m", strlen("\033[0m"));
     write(1, greeting, strlen(greeting));

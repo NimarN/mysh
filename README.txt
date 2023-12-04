@@ -70,11 +70,21 @@ These changed file descriptors were then either reset by execv or manually by my
 
 Pipelines
 --------------------
-
+If the processArgs() function encounters a "|" character, then the function will split the current argument list into two seperate argument lists. The first argument list is the tokens which appear to the left of the 
+pipe "|" character. The second argument list consits of all tokens to the right of the "|" pipe character. processArgs() will then pass these two lists into execPipe(). execPipe() begins by opening a pipe with a read and 
+write end. The function proceeds with a call to fork() where the use of dup2() will redirect stdout to the write end of the previously established pipe. Then the left half of the argument list will be passed to a recusive call
+to processArgs() so the tokens can be processed and executed. Upon exection of the "left" commands and returning to the execPipe function(), the write end of the pipe will be closed. The function will then proceed to fork() once again
+and this time redirect stdinput to the read end of the pipe. The processArgs() function will be called recursively and the "right" commands will be passed in as an argument for processes and exection. 
 
 Conditionals
 --------------------
-
+Conditional commands begin with "then" or "else". The execution of the conditional command is dependent on the success/failure of the previous command. To status of the previous command
+is held in the global variable statusFlag. If statusFlag is 1, then this indicates that the previous command suceeded. If the statusFlag is 0, then this inidicates that the previous command
+failed. By default at the beginning of the shell startup the statusFlag is set to 1. When determining the status of the preivous command there are multiple seperate cases that are considered. If 
+the command envokes a child process via running a program or pipes, then the exit status of the child processes are obtained through macros WIFEXITED, WEXITSTATUS and WIFSIGNALED. If WIFEXITED = 1 and WIFEXITSTATUS = 0 then
+the statusFlag is set to 1 for success. Otherwise, if WIFEXITED and WIFEXITSTATUS both are 1 then the statusFlag is set to 0 for failure. If WIFSIGNALED is 1, then the signalFlag is set to 0 for failure. 
+If the user provides the wrong arguments to the builtins which, pwd and cd then the statusFlag will be set to 0 for failure, otherwise set to 1 for success. Under the circumstances where the user provides 
+invalid arguments to barenames the statusFlag will be updated. Finally if the user provides any command which is unrecognizable by the shell then the status flag will be set to 0 for failure. 
 
 
 Mysh.c
@@ -107,8 +117,11 @@ processArgs()
 --------------------
 
 
-acceptArgs
+acceptArgs()
 --------------------
+acceptArgs() will iterate through the input which was passed by main and collect the tokens to build the argument list. 
+
+main()
 
 
 
