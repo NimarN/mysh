@@ -98,7 +98,7 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
 
         if (strcmp(arguments[0], "pwd") == 0) {
             // pwd command
-            write(1, "Built in PWD: ", strlen("Built in PWD: "));
+            //write(1, "Built in PWD: ", strlen("Built in PWD: "));
             write(1, cwd, strlen(cwd));
             write(1, "\n", strlen("\n\0"));
           
@@ -119,7 +119,7 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
                 
                 
                 if (access(check1, F_OK) == 0){
-                    write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
+                    //write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
                     write(1, check1, strlen(check1));
                     write(1, "\n", strlen("\n\0"));
                     free(check1); //free check1 string and return 
@@ -136,7 +136,7 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
 
                 //check if program is in "/usr/bin"
                 if (access(check2, F_OK) == 0){
-                    write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
+                    //write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
                     write(1, check2, strlen(check2));
                     write(1, "\n", strlen("\n\0"));
                     free(check2);
@@ -153,7 +153,7 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
 
                 //check if curr prog is in "/bin"
                 if (access(check3, F_OK) == 0){
-                    write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
+                    //write(1, "BuiltIn Which: ", strlen("BuiltIn Which:"));
                     write(1, check3, strlen(check3));
                     write(1, "\n", strlen("\n\0"));
                     
@@ -403,20 +403,20 @@ int processArgs(arraylist_t *arguments){
             if(chdir(arguments->data[1])==0)
             {
                 getcwd(cwd, sizeof(cwd));
-                printf("success!\nCurrent Dir is: %s\n", cwd);
+                //printf("success!\nCurrent Dir is: %s\n", cwd);
                 statusFlag = 1;
                 return argsize;
             }
             else{
                 getcwd(cwd, sizeof(cwd));
-                printf("fail!\nCurrent Dir is: %s\n", cwd);
+                printf("Error: cd failed\n");
                 statusFlag = 0;
                 return argsize;
             }
         }
         else if (argsize!=2 && strcmp(arguments->data[0],"cd")==0)
         {
-            printf("Wrong Number of Arguments for cd\n");
+            printf("Error: Wrong Number of Arguments for cd\n");
             statusFlag = 0;
             return argsize;
         }

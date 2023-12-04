@@ -16,10 +16,10 @@ It checks if it was given a filename, and then runs the THEN or ELSE conditional
 It then runs its wildcard expansion logic. This is followed by running the change directory (cd) BuiltIn if necessary.
 It then checks for Pipes and sets up argument lists to implement that functionality if need be.
 It then checks for Input and Output Redirection and sets up input and output files to prepare for execution.
-During these step, it will truncate arguments that should no longer be the argument list.
+During these step, it will truncate arguments that should no longer be in the argument list.
 It then checks if it needs to execute a local program or barenames, and takes the appropriate action.
 During the barename execution, if the command to run is PWD or WHICH, it uses our BuiltIn instead of any external command.
-During execution Child processes would have their input and output sources changed if neccessary, and would exit, returning
+During execution, Child processes would have their input and output sources changed if neccessary, and would exit, returning
 stdinput and stdoutput back to their original states.
 The process then repeats until the user runs exit or the process is terminated with ctrl+c.
 
@@ -34,17 +34,19 @@ We made sure simple applications of our features worked before moving on to test
 An example of this would be testing wildcards in conjunction with multiple redirects and pipes, ensuring that in the most complex cases, our shell worked.
 Throughout this process, we also made sure to eliminate memory leaks, segmentation faults, address misuse, and all other error types that may have occured.
 
-Test Cases:
+Test Cases Include:
+- Testing Individual Compenents: wildcards, redirection, pipes, builtins, barenames, conditionals, etc.
+- Testing Combinations of Components: E.g. wildcards with redirection, wildcards with redirection and pipes, builtins with wildcards, redirection, and pipes, condtionals used after these combintions, etc.
+- Testing for Errors: When execv fails, when redirection is followed by a wildcard, when functions are given the wrong number of arguments, etc.
 
-Scenarios:
+
+--Descriptions of Required Components' Implementations--
 
 
-Pathnames
+Pathnames / Barenames
 --------------------
-
-
-Barenames
---------------------
+After parsing through our argument list, we first check to see if the first argument contains a / and if it does, assume it is an executable and attempt to execute it. 
+Directly after, we run our check bare names function which will search the three directories the assignment details mention and call execProg if a matching program is found. 
 
 
 Built-in commands
@@ -87,6 +89,9 @@ If the user provides the wrong arguments to the builtins which, pwd and cd then 
 invalid arguments to barenames the statusFlag will be updated. Finally if the user provides any command which is unrecognizable by the shell then the status flag will be set to 0 for failure. 
 
 
+--C files--
+
+
 Mysh.c
 --------------------
 This is the main code file which contains all methods used by our shell program, which also contains a header file to import our wildcard implementation functions. 
@@ -99,30 +104,36 @@ This C file contains the functions to execute wildcard expansion.
 It searches the required directory for entries matching the expansion, and correctly inserts them into an arrayList struct given by mysh.c.
 
 
-///**We Lowkey dont need to elaborate on all of these functions below but they are here***////
+--Individual Functions--
+
 
 execPipe()
 --------------------
+Function in mysh.c that is run if we find a pipe when parsing through the argument list.
+It takes two array list structs as parameters to setup the pipe and then runs processArgs for each side of the pipe after changing the appropriate file descriptors.
 
 
 execProg()
 --------------------
-
+This functions contains our redirection implementation as well as our builtins PWD and WHICH.
+It will also execute programas found from a barename search or from a local executable file.
 
 checkBareNames()
 --------------------
-
+Searchs the three directors /user/local/bin/, /user/bin/, and /bin/ to find an accessible function matching the one we wish to execute and calling execProg if found. 
 
 processArgs()
 --------------------
-
+This is the primary function in mysh.c and does its own checks while also calling other functions.
+It contains the conditional implementation, a call for wildcard expansion, the builtin CD, setup for pipes, setup for redirection, and many function calls for program execution.
 
 acceptArgs()
 --------------------
 acceptArgs() will iterate through the input which was passed by main and collect the tokens to build the argument list. 
 
 main()
-
+----------
+Prints the greeting and starts accepting input from the user to build an argument list and potentially execute a comand.
 
 
 
