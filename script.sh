@@ -1,5 +1,6 @@
-ls .
-cat arraylist.c 
-ls | sort 
-echo hello > hello.txt 
-ls *.c 
+pwd 
+ls 
+ls | sort
+pwd > batchtest.txt
+
+
