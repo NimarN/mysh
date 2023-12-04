@@ -67,14 +67,13 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
     int stdoutfd = dup(1); */
     //initialize process id and fork()
     pid_t pid = fork();
-    //uncommenting below makes the output redirect work
-    //printf(":");
+    
 
     if (pid == 0){
         // Child process
         // check that output and input files are not null
         //uncommenting below makes the output redirect work
-        //printf("1");
+       
         if (outputFile!=NULL)
         {
             //set fd
@@ -104,7 +103,7 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
             write(1, "\n", strlen("\n\0"));
           
             //success
-            exit(1);
+            exit(0);
         }
 
         if (strcmp(arguments[0], "which") == 0) {
@@ -124,7 +123,7 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
                     write(1, check1, strlen(check1));
                     write(1, "\n", strlen("\n\0"));
                     free(check1); //free check1 string and return 
-                    exit(1);
+                    exit(0);
                 } else {
                     // free check1 
                     free(check1);
@@ -142,7 +141,7 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
                     write(1, "\n", strlen("\n\0"));
                     free(check2);
                     
-                    exit(1);
+                    exit(0);
                 } else {
                     free(check2);
                 }
@@ -158,19 +157,18 @@ void execProg(char *filename, char **arguments, char *outputFile, char *inputFil
                     write(1, check3, strlen(check3));
                     write(1, "\n", strlen("\n\0"));
                     
-                    exit(1);
+                    exit(0);
                 } else{
                     free(check3);
                 }
-                //printf("BuiltIn Which: %s\n", filename);
+               
                 //fail
-                
-                exit(0);
+                exit(1);
             }
             else
             {
 
-                exit(0);
+                exit(1);
             }
         }
 
@@ -286,6 +284,10 @@ void checkBareNames(arraylist_t *argList, int argsize, char *outputFile, char *i
 /*Process args will process the actual commands*/
 int processArgs(arraylist_t *arguments){
 
+    
+    if (strlen(arguments->data[0]) == 0){
+        return arguments->length;
+    }
     //set the first argument to filename
     char *filename = arguments->data[0];
     
@@ -364,7 +366,10 @@ int processArgs(arraylist_t *arguments){
     /**** EXITING HERE ****/
     //If first argument is exit then exit immeadeatly
     if (strcmp(filename, "exit") == 0){
+        write(1, "\033[0;31m", strlen("\033[0;31m"));
         printf("Exiting...\n");
+        write(1, "\033[0m", strlen("\033[0m"));
+
         exit(1);
     }
 
@@ -393,8 +398,6 @@ int processArgs(arraylist_t *arguments){
         getcwd(cwd, sizeof(cwd));
 
         //cd here
-        //printf("%d\n", argsize);
-        //printf("%s\n", arguments->data[0]);
         if (argsize==2 && strcmp(arguments->data[0],"cd")==0)
         {
             if(chdir(arguments->data[1])==0)
@@ -428,6 +431,7 @@ int processArgs(arraylist_t *arguments){
         for(int j = 0; j < strlen(arguments->data[i]); j++){
             //if you encounter a '|' char
             if(arguments->data[i][j] == 124){
+
                 //Terminate the left half pipe argument array list
                 al_push(pipeArgList, NULL); 
                 //save the right half of command (whatever is after '|')
@@ -467,13 +471,30 @@ int processArgs(arraylist_t *arguments){
         if (strcmp(arguments->data[i], ">")==0 && arguments->data[i+1] != NULL)
         {   
             //when we encounter a ">"
+            if (i + 1 > argsize) return argsize;
+            /*ensure no wildcards*/
+            for (int j = 0; j < strlen(arguments->data[i+1]); j++){
+                if (arguments->data[i + 1][j] == 42){
+                    statusFlag = 0;
+                    return argsize;
+                }
+            }
             redirectFlag = 1; //set redirect flag
             outputFile = malloc(strlen(arguments->data[i+1]) + 1); //allocate size for outputFile
             strcpy(outputFile, arguments->data[i+1]); //copy name of output file over
             i = i+1;
         }
         else if (strcmp(arguments->data[i], "<")==0 && arguments->data[i+1] != NULL)
-        {
+        {   
+
+            if (i + 1 > argsize) return argsize;
+            /*ensure no wildcards*/
+            for (int j = 0; j < strlen(arguments->data[i+1]); j++){
+                if (arguments->data[i + 1][j] == 42){
+                    statusFlag = 0;
+                    return argsize;
+                }
+            }
             //when we encounter a "<"
             redirectFlag = 1; //set redirect flag
             inputFile = malloc(strlen(arguments->data[i+1]) + 1); //allocate size for inputFile
@@ -545,10 +566,7 @@ int processArgs(arraylist_t *arguments){
             return argsize;
         }
     }
-
-    /**** SHELL BUILT INS HERE ****/
     
-
     /**** BARENAME CHECK HERE ****/
     checkBareNames(arguments, argsize, outputFile, inputFile, cwd);
 
@@ -582,7 +600,7 @@ void acceptArgs(char *buf, int bytes){
     int start = 0;  
     for (int i = 0; i < bytes; i++){
         //if you encounter a space, this marks the end of a single argument
-        if (i > 0 && isspace(buf[i]) && !(isspace(buf[i - 1]))){ 
+        if ((i > 0 && isspace(buf[i]) && !(isspace(buf[i - 1]))) || (i == bytes - 1 && argList->length == 0)){ 
             
             char *arg = malloc(i - start + 1); //allocate space for the current argument
            
@@ -645,7 +663,7 @@ void acceptArgs(char *buf, int bytes){
             }
             start = i + 1; //update start 
         }
-    }
+    } 
 
     //pass the arraylist to processArgs
     processArgs(argList);
@@ -667,15 +685,30 @@ int main(int argc, char **argv){
     
     //initialize the previous process exit flag
     statusFlag = 1;
-    
-    char *greeting = "Welcome to mysh! :) \n"; //print greeting
+    char *icon = 
+
+
+    "\n\n /$$      /$$ /$$     /$$ /$$$$$$  /$$   /$$\n"
+    "| $$$    /$$$|  $$   /$$//$$__  $$| $$  | $$\n"
+    "| $$$$  /$$$$ \\  $$ /$$/| $$  \\__/| $$  | $$\n"
+    "| $$ $$/$$ $$  \\  $$$$/ |  $$$$$$ | $$$$$$$$\n"
+    "| $$  $$$| $$   \\  $$/   \\____  $$| $$__  $$\n"
+    "| $$\\  $ | $$    | $$    /$$  \\ $$| $$  | $$\n"
+    "| $$ \\/  | $$    | $$   |  $$$$$$/| $$  | $$\n"
+    "|__/     |__/    |__/    \\______/ |__/  |__/\n\n";
+                                            
+                                                        
+    char *greeting = "Welcome To MYSH! :) \n\n"; //print greeting
     int fd, command_length, bytes, start = 0;
     char *buf = malloc(BUFSIZE); //allocate buffer on the heap
     char *input = NULL;
     int bytesLeftover = 0;
 
-    write(1, greeting, strlen(greeting)); //write the greeting to stdout
     
+    
+    write(1, icon, strlen(icon)); //write the greeting to stdout
+    write(1, "\033[0m", strlen("\033[0m"));
+    write(1, greeting, strlen(greeting));
     //Check is user provides a file for batch mode, open if file provided
     if (argc > 1){
         fd = open(argv[1], O_RDONLY);
@@ -687,10 +720,14 @@ int main(int argc, char **argv){
         //if no file provided take input from stdin
         fd = STDIN_FILENO;
     }
-
+    
     while(1){
-        //prompt message
-        write(1, "mysh> ", 6);
+        //prompt message 
+        if (argc == 1){
+            write(1, "\033[0;36m", strlen("\033[0;36m"));
+            write(1, "mysh> ", 6);
+            write(1, "\033[0m", strlen("\033[0m"));
+        }
         //read respective file
         bytes = read(fd, buf , BUFSIZE);
         if (bytes == 0){
@@ -701,11 +738,16 @@ int main(int argc, char **argv){
         if (fd != 0){ 
             for(int i = 0; i < bytes; i++){
                 if(buf[i] == '\n' && i > 0){ //we have reached the end of a command
-                    command_length = i - start;  //record the length of the command
+                    command_length = i - start + 1;  //record the length of the command
                     input = malloc(command_length + 1); //allocate space to hold command
                     memcpy(input, buf + start, command_length); //copy command into input
                     input[command_length] = '\0'; //null terminate the input 
-                   
+                    if (strlen(input) == 0){
+                        free(input);
+                        start = i + 1;
+                        command_length = 0;
+                        continue;
+                    }
                     acceptArgs(input, command_length);
                     free(input);
                     
