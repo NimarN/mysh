@@ -373,6 +373,23 @@ int processArgs(arraylist_t *arguments){
         exit(1);
     }
 
+    /**Making sure there is no wildcard after redirect**/
+    for (int i=1; i < argsize-1 ;i++)
+    {
+        //if argument has a wildcard, start expansion.
+        if(strcmp(arguments->data[i],"<") || strcmp(arguments->data[i],">"))
+        {
+            if (strchr(arguments->data[i+1], '*')!=NULL)
+            {
+                printf("Error: Wildcard after redirect\n");
+                statusFlag = 0;
+                return argsize;
+            }
+        }
+    }
+
+
+
     /**** WILD CARD EXPANSION HERE ****/
     //once the argument list has been expanded, we can handle all other cases 
    
